@@ -1,0 +1,44 @@
+# ── Dependencies ──
+node_modules/
+
+# ── Environment variables (secrets) ──
+.env
+.env.local
+.env.*.local
+
+# ── Build output ──
+dist/
+dist-ssr/
+build/
+
+# ── Logs ──
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ── OS files ──
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Editor / IDE ──
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.local
+
+# ── Test / temp scripts ──
+test-*.mjs
+test-*.js
+
+# ── Misc ──
+*.tgz
+.cache/
