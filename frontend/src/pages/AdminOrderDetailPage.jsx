@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import formatPrice from '../utils/formatPrice';
 
-const API = 'http://localhost:5000/api';
+const API = 'https://pehnawafashionhub.onrender.com/api';
 
 const STATUSES = ['Pending', 'Paid', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
 

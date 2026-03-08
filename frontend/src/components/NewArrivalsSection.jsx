@@ -16,7 +16,7 @@ const NewArrivalsSection = () => {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const response = await fetch('http://localhost:5000/api/products/tag/New Arrival');
+                const response = await fetch('https://pehnawafashionhub.onrender.com/api/products/tag/New Arrival');
                 const data = await response.json();
                 if (data.success) {
                     setProducts(data.products);

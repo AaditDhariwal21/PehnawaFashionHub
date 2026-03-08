@@ -7,7 +7,7 @@ import { useCart } from '../context/CartContext';
 import formatPrice from '../utils/formatPrice';
 import './OrderConfirmationPage.css';
 
-const API = 'http://localhost:5000/api';
+const API = 'https://pehnawafashionhub.onrender.com/api';
 
 const STATUS_COLORS = {
     Pending: { bg: '#fef3c7', color: '#92400e' },

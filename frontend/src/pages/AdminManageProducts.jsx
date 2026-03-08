@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import formatPrice from '../utils/formatPrice';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://pehnawafashionhub.onrender.com/api';
 
 const categories = ['Anarkalis', 'Coord Sets', 'Lehangas', 'Indo Western', 'Suits & Kurtis', 'Sarees', 'Blouses', 'Kidswear', "Men's Kurta", 'Dupattas', 'Pashminas'];
 const specialTags = ['', 'New Arrival', 'Best Seller', 'Sale', 'Trending'];

@@ -9,7 +9,7 @@ import formatPrice from '../utils/formatPrice';
 import './CheckoutPage.css';
 
 const FALLBACK_SHIPPING = 8;
-const API = 'http://localhost:5000/api';
+const API = 'https://pehnawafashionhub.onrender.com/api';
 
 const REQUIRED_FIELDS = [
     { key: 'fullName', label: 'Full Name' },

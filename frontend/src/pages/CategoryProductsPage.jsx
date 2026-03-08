@@ -20,7 +20,7 @@ const CategoryProductsPage = () => {
                 setLoading(true);
                 setError(null);
                 const response = await fetch(
-                    `http://localhost:5000/api/products/category/${encodeURIComponent(categoryName)}`
+                    `https://pehnawafashionhub.onrender.com/api/products/category/${encodeURIComponent(categoryName)}`
                 );
                 const data = await response.json();
 

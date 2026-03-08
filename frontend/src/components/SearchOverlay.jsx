@@ -4,7 +4,7 @@ import { Search, X } from 'lucide-react';
 
 import './SearchOverlay.css';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://pehnawafashionhub.onrender.com/api';
 
 const popularSearches = [
     'Anarkali Suits',
