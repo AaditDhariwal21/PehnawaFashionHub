@@ -1,0 +1,137 @@
+/* ─── CheckoutPage responsive & input styles ─── */
+
+.checkout-page {
+    min-height: 100vh;
+    background-color: #fff;
+}
+
+.checkout-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 2rem 4rem;
+    display: flex;
+    gap: 3rem;
+    align-items: flex-start;
+}
+
+/* ─── Left Panel ─── */
+.checkout-left {
+    flex: 1 1 580px;
+    min-width: 0;
+}
+
+/* ─── Right Panel ─── */
+.checkout-right {
+    flex: 0 0 380px;
+    position: sticky;
+    top: 5.5rem;
+}
+
+/* ─── Form Inputs ─── */
+.checkout-input {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    font-size: 0.9rem;
+    font-family: inherit;
+    color: #111827;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.checkout-input:focus {
+    border-color: #EFBF04;
+    box-shadow: 0 0 0 3px rgba(239, 191, 4, 0.15);
+}
+
+.checkout-input::placeholder {
+    color: #9ca3af;
+}
+
+/* ─── Select ─── */
+.checkout-select {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    font-size: 0.9rem;
+    font-family: inherit;
+    color: #111827;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.checkout-select:focus {
+    border-color: #EFBF04;
+    box-shadow: 0 0 0 3px rgba(239, 191, 4, 0.15);
+}
+
+/* ─── Side-by-side fields ─── */
+.checkout-row {
+    display: flex;
+    gap: 1rem;
+}
+
+.checkout-row>div {
+    flex: 1;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 768px) {
+    .checkout-container {
+        flex-direction: column;
+        padding: 1.5rem 1rem 3rem;
+        gap: 2rem;
+    }
+
+    .checkout-left {
+        flex: 1 1 auto;
+    }
+
+    .checkout-right {
+        flex: 1 1 auto;
+        position: static;
+        width: 100%;
+    }
+
+    .checkout-row {
+        flex-direction: column;
+        gap: 0;
+    }
+}
+
+/* ─── Validation Errors ─── */
+.checkout-input.input-error {
+    border-color: #ef4444;
+}
+
+.checkout-input.input-error:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.field-error {
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 0.78rem;
+    color: #ef4444;
+    font-weight: 500;
+}
+
+/* ─── Shipping Loading Spinner ─── */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.shipping-spinner {
+    animation: spin 0.8s linear infinite;
+}

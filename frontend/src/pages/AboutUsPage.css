@@ -1,0 +1,196 @@
+/* ===== About Us Page ===== */
+
+.about-us-page {
+    font-family: inherit;
+    color: #111827;
+    background-color: #fff;
+}
+
+/* --- Hero --- */
+.about-hero {
+    background: linear-gradient(180deg, #fdf8e8 0%, #fff 100%);
+    text-align: center;
+    padding: 5rem 2rem 3.5rem;
+}
+
+.about-hero h1 {
+    font-size: 2.6rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 1.2rem;
+    letter-spacing: -0.01em;
+}
+
+.about-hero h1 span {
+    color: #EFBF04;
+}
+
+.about-hero .hero-intro {
+    max-width: 780px;
+    margin: 0 auto;
+    font-size: 1.05rem;
+    line-height: 1.75;
+    color: #4b5563;
+}
+
+/* --- Sections wrapper --- */
+.about-sections {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 2rem 4rem;
+}
+
+/* --- Individual section --- */
+.about-section {
+    margin-bottom: 3rem;
+    padding-bottom: 3rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.about-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.about-section h2 {
+    font-size: 1.55rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 1rem;
+}
+
+.about-section h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 1.8rem 0 0.75rem;
+}
+
+.about-section p {
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #4b5563;
+    margin: 0 0 1rem;
+}
+
+/* --- Bullet lists --- */
+.about-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 1.2rem;
+}
+
+.about-section ul li {
+    position: relative;
+    padding-left: 1.5rem;
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #4b5563;
+    margin-bottom: 0.35rem;
+}
+
+.about-section ul li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.65rem;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #EFBF04;
+}
+
+/* --- "Why Choose" cards --- */
+.why-choose-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+    margin-top: 1.5rem;
+}
+
+.why-choose-card {
+    background: #fdf8e8;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    transition: box-shadow 0.25s ease;
+}
+
+.why-choose-card:hover {
+    box-shadow: 0 4px 20px rgba(239, 191, 4, 0.15);
+}
+
+.why-choose-card .card-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.why-choose-card h4 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 0.4rem;
+}
+
+.why-choose-card p {
+    font-size: 0.88rem;
+    line-height: 1.65;
+    color: #6b7280;
+    margin: 0;
+}
+
+/* --- CTA --- */
+.about-cta {
+    background: linear-gradient(180deg, #fff 0%, #fdf8e8 100%);
+    text-align: center;
+    padding: 3.5rem 2rem 4rem;
+}
+
+.about-cta p {
+    max-width: 660px;
+    margin: 0 auto 0.75rem;
+    font-size: 1.05rem;
+    line-height: 1.75;
+    color: #4b5563;
+}
+
+.about-cta .cta-highlight {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+    .about-hero {
+        padding: 3.5rem 1.25rem 2.5rem;
+    }
+
+    .about-hero h1 {
+        font-size: 1.8rem;
+    }
+
+    .about-hero .hero-intro {
+        font-size: 0.95rem;
+    }
+
+    .about-sections {
+        padding: 1.5rem 1.25rem 3rem;
+    }
+
+    .about-section h2 {
+        font-size: 1.3rem;
+    }
+
+    .about-section h3 {
+        font-size: 1.05rem;
+    }
+
+    .why-choose-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .about-cta {
+        padding: 2.5rem 1.25rem 3rem;
+    }
+}

@@ -1,0 +1,153 @@
+/* ===== Privacy Policy Page ===== */
+
+.privacy-page {
+    font-family: inherit;
+    color: #111827;
+    background-color: #fff;
+}
+
+/* --- Hero --- */
+.privacy-hero {
+    background: linear-gradient(180deg, #fdf8e8 0%, #fff 100%);
+    text-align: center;
+    padding: 5rem 2rem 3rem;
+}
+
+.privacy-hero h1 {
+    font-size: 2.6rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 0.6rem;
+}
+
+.privacy-hero h1 span {
+    color: #EFBF04;
+}
+
+.privacy-hero .last-updated {
+    font-size: 0.88rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+/* --- Sections wrapper --- */
+.privacy-sections {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2.5rem 2rem 4rem;
+}
+
+/* --- Intro --- */
+.privacy-intro {
+    margin-bottom: 2.5rem;
+}
+
+.privacy-intro p {
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #4b5563;
+    margin: 0 0 0.85rem;
+}
+
+/* --- Section --- */
+.privacy-section {
+    margin-bottom: 2.5rem;
+    padding-bottom: 2.5rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.privacy-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.privacy-section h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 1rem;
+}
+
+.privacy-section h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 1.4rem 0 0.65rem;
+}
+
+.privacy-section p {
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #4b5563;
+    margin: 0 0 0.85rem;
+}
+
+/* --- Bullet list --- */
+.privacy-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 1rem;
+}
+
+.privacy-section ul li {
+    position: relative;
+    padding-left: 1.5rem;
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #4b5563;
+    margin-bottom: 0.3rem;
+}
+
+.privacy-section ul li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.65rem;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #EFBF04;
+}
+
+/* --- Contact block --- */
+.privacy-contact-block {
+    background: #fdf8e8;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.privacy-contact-block a {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #111827;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.privacy-contact-block a:hover {
+    color: #EFBF04;
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+    .privacy-hero {
+        padding: 3.5rem 1.25rem 2.5rem;
+    }
+
+    .privacy-hero h1 {
+        font-size: 1.8rem;
+    }
+
+    .privacy-sections {
+        padding: 1.5rem 1.25rem 3rem;
+    }
+
+    .privacy-section h2 {
+        font-size: 1.2rem;
+    }
+}

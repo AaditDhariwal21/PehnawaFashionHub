@@ -1,0 +1,447 @@
+/* ===== Account Page ===== */
+
+.account-pg {
+    font-family: inherit;
+    color: #111827;
+    background-color: #fafafa;
+    min-height: 100vh;
+}
+
+/* --- Layout --- */
+.account-layout {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2.5rem 2rem 4rem;
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 2.5rem;
+    min-height: 65vh;
+}
+
+/* ===================== SIDEBAR ===================== */
+.account-sidebar {
+    background: #fff;
+    border: 1px solid #f3f4f6;
+    border-radius: 1rem;
+    padding: 2rem 1.5rem;
+    height: fit-content;
+    position: sticky;
+    top: 6rem;
+}
+
+/* Avatar block */
+.account-avatar {
+    text-align: center;
+    margin-bottom: 1.75rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.account-avatar-circle {
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #EFBF04, #f5d442);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.15rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.75rem;
+    letter-spacing: 0.03em;
+}
+
+.account-avatar-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 0.2rem;
+}
+
+.account-avatar-email {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Nav items */
+.account-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.account-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.7rem 0.9rem;
+    border: none;
+    border-radius: 0.6rem;
+    background: transparent;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    font-family: inherit;
+}
+
+.account-nav-item:hover {
+    background: #fdf8e8;
+    color: #111827;
+}
+
+.account-nav-item.active {
+    background: #fdf8e8;
+    color: #111827;
+    font-weight: 600;
+    border-left: 3px solid #EFBF04;
+}
+
+/* ===================== CONTENT ===================== */
+.account-content {
+    background: #fff;
+    border: 1px solid #f3f4f6;
+    border-radius: 1rem;
+    padding: 2.5rem;
+}
+
+.account-content h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 0.3rem;
+}
+
+.account-info-sub {
+    font-size: 0.9rem;
+    color: #9ca3af;
+    margin: 0 0 2rem;
+}
+
+/* --- Fields --- */
+.account-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 1.35rem;
+    max-width: 480px;
+}
+
+.account-field label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.4rem;
+    letter-spacing: 0.01em;
+}
+
+.account-field input {
+    width: 100%;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    color: #111827;
+    background: #fff;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    font-family: inherit;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.account-field input:focus {
+    border-color: #EFBF04;
+    box-shadow: 0 0 0 3px rgba(239, 191, 4, 0.12);
+}
+
+.account-field input.disabled-field {
+    background: #f9fafb;
+    color: #9ca3af;
+    cursor: not-allowed;
+}
+
+.field-hint {
+    display: block;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-top: 0.3rem;
+}
+
+/* --- Action buttons --- */
+.account-actions {
+    margin-top: 1.75rem;
+}
+
+.btn-save {
+    padding: 0.65rem 2rem;
+    border: none;
+    border-radius: 0.5rem;
+    background: #EFBF04;
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    font-family: inherit;
+}
+
+.btn-save:hover {
+    opacity: 0.88;
+}
+
+/* --- Logout --- */
+.account-logout-section {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #f3f4f6;
+}
+
+.btn-logout {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.6rem 1.5rem;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: #6b7280;
+    font-size: 0.88rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.btn-logout:hover {
+    border-color: #EFBF04;
+    color: #111827;
+}
+
+/* ===================== ORDERS EMPTY ===================== */
+.account-orders-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 4rem 1rem;
+}
+
+.account-orders-empty svg {
+    margin: 0 auto 1.25rem;
+    display: block;
+}
+
+.empty-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #374151;
+    margin: 0 0 0.35rem;
+}
+
+.empty-desc {
+    font-size: 0.9rem;
+    color: #9ca3af;
+    margin: 0 0 1.5rem;
+}
+
+.btn-shop {
+    padding: 0.6rem 2rem;
+    border: none;
+    border-radius: 0.5rem;
+    background: #EFBF04;
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    font-family: inherit;
+}
+
+.btn-shop:hover {
+    opacity: 0.88;
+}
+
+/* ===================== ORDER LIST ===================== */
+.account-orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.account-order-card {
+    background: #fff;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1.25rem 1.5rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+}
+
+.account-order-card:hover {
+    border-color: #EFBF04;
+    box-shadow: 0 3px 14px rgba(239, 191, 4, 0.12);
+}
+
+/* 3-column row */
+.account-order-row {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+/* Thumbnail */
+.account-order-thumb-wrap {
+    flex-shrink: 0;
+    text-align: center;
+}
+
+.account-order-thumb {
+    width: 60px;
+    height: 60px;
+    border-radius: 0.6rem;
+    overflow: hidden;
+    border: 1px solid #f3f4f6;
+    background: #f9fafb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.account-order-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.account-order-thumb-placeholder {
+    font-size: 1.5rem;
+}
+
+.account-order-more {
+    font-size: 0.7rem;
+    color: #9ca3af;
+    margin: 0.25rem 0 0;
+}
+
+/* Info column */
+.account-order-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.account-order-id {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 0.15rem;
+}
+
+.account-order-date {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    margin: 0 0 0.4rem;
+}
+
+.account-order-total {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+}
+
+/* Actions column */
+.account-order-actions {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.6rem;
+}
+
+.account-order-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.account-order-view-btn {
+    padding: 0.4rem 1.1rem;
+    border: 1.5px solid #EFBF04;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: #EFBF04;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+}
+
+.account-order-view-btn:hover {
+    background: #EFBF04;
+    color: #fff;
+}
+
+/* ===================== RESPONSIVE ===================== */
+@media (max-width: 768px) {
+    .account-layout {
+        grid-template-columns: 1fr;
+        padding: 1.25rem 1rem 3rem;
+        gap: 1.25rem;
+    }
+
+    .account-sidebar {
+        position: static;
+        padding: 1.25rem;
+    }
+
+    .account-avatar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        text-align: left;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+    }
+
+    .account-avatar-circle {
+        width: 2.75rem;
+        height: 2.75rem;
+        font-size: 1rem;
+        margin: 0;
+    }
+
+    .account-nav {
+        flex-direction: row;
+        gap: 0.5rem;
+    }
+
+    .account-nav-item {
+        padding: 0.55rem 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .account-nav-item.active {
+        border-left: none;
+        border-bottom: 2px solid #EFBF04;
+    }
+
+    .account-content {
+        padding: 1.5rem;
+    }
+
+    .account-content h1 {
+        font-size: 1.3rem;
+    }
+}

@@ -1,0 +1,230 @@
+.search-results {
+    min-height: 100vh;
+    background: #fff;
+}
+
+/* ── Breadcrumb ── */
+.search-results__breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 2rem;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.search-results__breadcrumb button {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    padding: 0;
+    transition: color 0.2s;
+}
+
+.search-results__breadcrumb button:hover {
+    color: #1f2937;
+}
+
+.search-results__breadcrumb .current {
+    color: #1f2937;
+    font-weight: 500;
+}
+
+/* ── Header ── */
+.search-results__header {
+    padding: 2.5rem 2rem 1rem;
+}
+
+.search-results__title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.search-results__title span {
+    color: #EFBF04;
+}
+
+.search-results__count {
+    color: #6b7280;
+    font-size: 0.875rem;
+    margin-top: 0.4rem;
+}
+
+/* ── Grid ── */
+.search-results__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: 2rem;
+    padding: 1.5rem 2rem 4rem;
+}
+
+/* ── Product Card ── */
+.search-results__card {
+    cursor: pointer;
+}
+
+.search-results__card:hover .search-results__card-img {
+    transform: scale(1.05);
+}
+
+.search-results__card-img-wrap {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.75rem;
+    background: #f9fafb;
+    aspect-ratio: 3 / 4;
+}
+
+.search-results__card-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s;
+}
+
+.search-results__card-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(to bottom, #f3f4f6, #e5e7eb);
+    font-size: 2.5rem;
+    color: #d1d5db;
+}
+
+.search-results__card-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.05);
+    opacity: 0;
+    transition: opacity 0.3s;
+    border-radius: 0.75rem;
+}
+
+.search-results__card:hover .search-results__card-overlay {
+    opacity: 1;
+}
+
+.search-results__card-tag {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #fff;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #EFBF04, #d4a904);
+}
+
+.search-results__card-info {
+    padding: 0.75rem 0.25rem 0;
+}
+
+.search-results__card-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.2s;
+}
+
+.search-results__card:hover .search-results__card-name {
+    color: #374151;
+}
+
+.search-results__card-price {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #111827;
+    margin-top: 0.3rem;
+}
+
+/* ── Empty / Loading ── */
+.search-results__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 5rem 1rem;
+}
+
+.search-results__empty-icon {
+    width: 5rem;
+    height: 5rem;
+    border-radius: 50%;
+    background: #f9fafb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+    font-size: 2rem;
+}
+
+.search-results__empty h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.search-results__empty p {
+    color: #9ca3af;
+    font-size: 0.875rem;
+    margin-top: 0.4rem;
+}
+
+.search-results__loader {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 4rem);
+}
+
+.search-results__spinner {
+    width: 3rem;
+    height: 3rem;
+    border: 4px solid #e5e7eb;
+    border-top-color: #EFBF04;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+    .search-results__header {
+        padding: 1.5rem 1rem 0.75rem;
+    }
+
+    .search-results__title {
+        font-size: 1.4rem;
+    }
+
+    .search-results__grid {
+        grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+        gap: 1rem;
+        padding: 1rem;
+    }
+
+    .search-results__breadcrumb {
+        padding: 0.75rem 1rem;
+    }
+}

@@ -1,0 +1,283 @@
+/* ═══ Order Confirmation Page ═══ */
+
+.ocp {
+    min-height: 100vh;
+    background: #fafafa;
+}
+
+.ocp-loading {
+    text-align: center;
+    padding: 6rem 1rem;
+    font-size: 1rem;
+    color: #6b7280;
+}
+
+.ocp-wrapper {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 4rem;
+}
+
+/* ── Success Banner ── */
+.ocp-success-banner {
+    text-align: center;
+    padding: 2.5rem 1rem 2rem;
+    margin-bottom: 2rem;
+}
+
+.ocp-check-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #d1fae5;
+    margin-bottom: 1rem;
+}
+
+.ocp-success-title {
+    font-size: 1.65rem;
+    font-weight: 800;
+    color: #111827;
+    margin: 0 0 0.4rem;
+    letter-spacing: -0.01em;
+}
+
+.ocp-success-sub {
+    font-size: 0.95rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+/* ── Meta Row ── */
+.ocp-meta-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding: 1.25rem 1.5rem;
+    background: #fff;
+    border-radius: 0.75rem;
+    border: 1px solid #f3f4f6;
+}
+
+.ocp-meta-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.ocp-meta-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #9ca3af;
+    font-weight: 600;
+}
+
+.ocp-meta-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.ocp-status-badge {
+    display: inline-block;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    width: fit-content;
+}
+
+/* ── Grid ── */
+.ocp-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.ocp-card {
+    background: #fff;
+    border: 1px solid #f3f4f6;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+}
+
+.ocp-card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+/* ── Items ── */
+.ocp-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    margin-bottom: 1.25rem;
+}
+
+.ocp-item {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+}
+
+.ocp-item-img {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border-radius: 0.5rem;
+    border: 1px solid #f3f4f6;
+    flex-shrink: 0;
+}
+
+.ocp-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.ocp-item-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 0.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ocp-item-size,
+.ocp-item-qty {
+    font-size: 0.78rem;
+    color: #9ca3af;
+    margin: 0;
+}
+
+.ocp-item-price {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #111827;
+    white-space: nowrap;
+}
+
+/* ── Totals ── */
+.ocp-totals {
+    border-top: 1px solid #f3f4f6;
+    padding-top: 1rem;
+}
+
+.ocp-total-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.88rem;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+}
+
+.ocp-total-final {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #111827;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* ── Address ── */
+.ocp-addr {
+    font-size: 0.88rem;
+    color: #374151;
+    line-height: 1.7;
+}
+
+.ocp-addr p {
+    margin: 0;
+}
+
+.ocp-addr-name {
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 0.25rem !important;
+}
+
+.ocp-addr-phone {
+    margin-top: 0.5rem !important;
+    color: #6b7280;
+}
+
+/* ── Actions ── */
+.ocp-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.ocp-btn-primary {
+    padding: 0.75rem 2rem;
+    background: linear-gradient(135deg, #EFBF04, #d4a904);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-family: inherit;
+    letter-spacing: 0.03em;
+    transition: opacity 0.15s, box-shadow 0.15s;
+}
+
+.ocp-btn-primary:hover {
+    opacity: 0.9;
+    box-shadow: 0 4px 12px rgba(239, 191, 4, 0.35);
+}
+
+.ocp-btn-secondary {
+    padding: 0.75rem 2rem;
+    background: transparent;
+    color: #374151;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: 1.5px solid #d1d5db;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+.ocp-btn-secondary:hover {
+    border-color: #EFBF04;
+    color: #EFBF04;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .ocp-wrapper {
+        padding: 1.5rem 1rem 3rem;
+    }
+
+    .ocp-meta-row {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .ocp-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ocp-actions {
+        flex-direction: column;
+    }
+
+    .ocp-btn-primary,
+    .ocp-btn-secondary {
+        width: 100%;
+        text-align: center;
+    }
+}

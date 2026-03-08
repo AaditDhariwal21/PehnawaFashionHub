@@ -1,0 +1,261 @@
+/* ===== Contact Us Page ===== */
+
+.contact-us-page {
+    font-family: inherit;
+    color: #111827;
+    background-color: #fff;
+}
+
+/* --- Hero --- */
+.contact-hero {
+    background: linear-gradient(180deg, #fdf8e8 0%, #fff 100%);
+    text-align: center;
+    padding: 5rem 2rem 3.5rem;
+}
+
+.contact-hero h1 {
+    font-size: 2.6rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 0.6rem;
+    letter-spacing: -0.01em;
+}
+
+.contact-hero h1 span {
+    color: #EFBF04;
+}
+
+.contact-hero .hero-subtitle {
+    font-size: 1.15rem;
+    font-weight: 500;
+    color: #374151;
+    margin: 0 0 1.4rem;
+}
+
+.contact-hero .hero-intro {
+    max-width: 700px;
+    margin: 0 auto;
+    font-size: 1rem;
+    line-height: 1.75;
+    color: #4b5563;
+}
+
+.contact-hero .hero-intro+.hero-intro {
+    margin-top: 0.75rem;
+}
+
+/* --- Sections wrapper --- */
+.contact-sections {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 2rem 4rem;
+}
+
+/* --- Section --- */
+.contact-section {
+    margin-bottom: 3rem;
+    padding-bottom: 3rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.contact-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.contact-section h2 {
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.contact-section h2 .section-emoji {
+    font-size: 1.3rem;
+}
+
+.contact-section p {
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #4b5563;
+    margin: 0 0 0.85rem;
+}
+
+/* --- Contact info cards --- */
+.contact-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+}
+
+.contact-info-card {
+    background: #fdf8e8;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    transition: box-shadow 0.25s ease;
+}
+
+.contact-info-card:hover {
+    box-shadow: 0 4px 20px rgba(239, 191, 4, 0.15);
+}
+
+.contact-info-card .card-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0 0 0.4rem;
+}
+
+.contact-info-card a {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #111827;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.contact-info-card a:hover {
+    color: #EFBF04;
+}
+
+/* --- WhatsApp button --- */
+.whatsapp-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.85rem 2rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #fff;
+    background-color: #111827;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.2s;
+    margin-top: 0.5rem;
+}
+
+.whatsapp-btn:hover {
+    background-color: #1f2937;
+}
+
+/* --- Bullet list --- */
+.contact-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 1.2rem;
+}
+
+.contact-section ul li {
+    position: relative;
+    padding-left: 1.5rem;
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #4b5563;
+    margin-bottom: 0.35rem;
+}
+
+.contact-section ul li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.65rem;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #EFBF04;
+}
+
+/* --- Hours block --- */
+.hours-block {
+    background: #f9fafb;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    display: inline-block;
+    margin-top: 0.5rem;
+}
+
+.hours-block .days {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 0.25rem;
+}
+
+.hours-block .time {
+    font-size: 0.95rem;
+    color: #4b5563;
+    margin: 0;
+}
+
+/* --- CTA --- */
+.contact-cta {
+    background: linear-gradient(180deg, #fff 0%, #fdf8e8 100%);
+    text-align: center;
+    padding: 3.5rem 2rem 4rem;
+}
+
+.contact-cta h2 {
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 1rem;
+}
+
+.contact-cta p {
+    max-width: 660px;
+    margin: 0 auto 0.75rem;
+    font-size: 1rem;
+    line-height: 1.75;
+    color: #4b5563;
+}
+
+.contact-cta .brand-line {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #111827;
+    margin-top: 1.5rem;
+}
+
+.contact-cta .tagline {
+    font-size: 0.95rem;
+    color: #6b7280;
+    font-style: italic;
+    margin-top: 0.25rem;
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+    .contact-hero {
+        padding: 3.5rem 1.25rem 2.5rem;
+    }
+
+    .contact-hero h1 {
+        font-size: 1.8rem;
+    }
+
+    .contact-sections {
+        padding: 1.5rem 1.25rem 3rem;
+    }
+
+    .contact-section h2 {
+        font-size: 1.25rem;
+    }
+
+    .contact-info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .contact-cta {
+        padding: 2.5rem 1.25rem 3rem;
+    }
+}

@@ -1,0 +1,200 @@
+/* ===== Refund Policy Page ===== */
+/* Reuses the shared .policy-* class naming convention */
+
+.policy-page {
+    font-family: inherit;
+    color: #111827;
+    background-color: #fff;
+}
+
+/* --- Hero --- */
+.policy-hero {
+    background: linear-gradient(180deg, #fdf8e8 0%, #fff 100%);
+    text-align: center;
+    padding: 5rem 2rem 3rem;
+}
+
+.policy-hero h1 {
+    font-size: 2.6rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 0.6rem;
+}
+
+.policy-hero h1 span {
+    color: #EFBF04;
+}
+
+.policy-hero .policy-subtitle {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #6b7280;
+    margin: 0;
+    letter-spacing: 0.02em;
+}
+
+/* --- Sections wrapper --- */
+.policy-sections {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2.5rem 2rem 4rem;
+}
+
+/* --- Section --- */
+.policy-section {
+    margin-bottom: 2.5rem;
+    padding-bottom: 2.5rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.policy-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.policy-section h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 1rem;
+}
+
+.policy-section h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 1.4rem 0 0.65rem;
+}
+
+.policy-section p {
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #4b5563;
+    margin: 0 0 0.85rem;
+}
+
+.policy-section .highlight-text {
+    font-weight: 600;
+    color: #111827;
+}
+
+/* --- Bullet list --- */
+.policy-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 1.2rem;
+}
+
+.policy-section ul li {
+    position: relative;
+    padding-left: 1.5rem;
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #4b5563;
+    margin-bottom: 0.35rem;
+}
+
+.policy-section ul li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.65rem;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #EFBF04;
+}
+
+/* --- Ordered sub-list (for Terms of Service nested numbering) --- */
+.policy-section ol {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 1rem;
+    counter-reset: sub-item;
+}
+
+.policy-section ol li {
+    position: relative;
+    padding-left: 1.8rem;
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #4b5563;
+    margin-bottom: 0.35rem;
+    counter-increment: sub-item;
+}
+
+.policy-section ol li::before {
+    content: counter(sub-item) '.';
+    position: absolute;
+    left: 0;
+    font-weight: 600;
+    color: #EFBF04;
+}
+
+/* --- Contact block --- */
+.policy-contact-block {
+    background: #fdf8e8;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.policy-contact-block a {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #111827;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.policy-contact-block a:hover {
+    color: #EFBF04;
+}
+
+/* --- CTA block --- */
+.policy-cta {
+    background: linear-gradient(180deg, #fff 0%, #fdf8e8 100%);
+    text-align: center;
+    padding: 3rem 2rem 3.5rem;
+}
+
+.policy-cta p {
+    max-width: 660px;
+    margin: 0 auto 0.5rem;
+    font-size: 1rem;
+    line-height: 1.75;
+    color: #4b5563;
+}
+
+.policy-cta .cta-highlight {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+    .policy-hero {
+        padding: 3.5rem 1.25rem 2.5rem;
+    }
+
+    .policy-hero h1 {
+        font-size: 1.8rem;
+    }
+
+    .policy-sections {
+        padding: 1.5rem 1.25rem 3rem;
+    }
+
+    .policy-section h2 {
+        font-size: 1.2rem;
+    }
+
+    .policy-cta {
+        padding: 2.5rem 1.25rem 3rem;
+    }
+}
