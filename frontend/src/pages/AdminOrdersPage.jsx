@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import formatPrice from '../utils/formatPrice';
 
-const API = 'https://pehnawafashionhub.onrender.com/api';
+const API = import.meta.env.VITE_API_URL;
 
 const STATUS_COLORS = {
     Pending: { bg: '#fef3c7', color: '#92400e' },

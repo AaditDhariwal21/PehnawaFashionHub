@@ -16,7 +16,7 @@ const SignInPage = () => {
     const navigate = useNavigate();
     const { login } = useAuth();
 
-    const API_BASE_URL = 'https://pehnawafashionhub.onrender.com/api';
+    const API_BASE_URL = import.meta.env.VITE_API_URL;
 
     // Handle Google credential response (ID token flow)
     const handleGoogleResponse = useCallback(async (response) => {

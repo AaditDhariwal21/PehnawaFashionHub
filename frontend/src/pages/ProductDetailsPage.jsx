@@ -22,7 +22,7 @@ const ProductDetailsPage = () => {
         const fetchProduct = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`https://pehnawafashionhub.onrender.com/api/products/${id}`);
+                const response = await fetch(`\${import.meta.env.VITE_API_URL}/products/${id}`);
                 const data = await response.json();
 
                 if (!data.success) {

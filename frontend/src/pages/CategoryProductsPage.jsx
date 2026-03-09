@@ -20,7 +20,7 @@ const CategoryProductsPage = () => {
                 setLoading(true);
                 setError(null);
                 const response = await fetch(
-                    `https://pehnawafashionhub.onrender.com/api/products/category/${encodeURIComponent(categoryName)}`
+                    `\${import.meta.env.VITE_API_URL}/products/category/${encodeURIComponent(categoryName)}`
                 );
                 const data = await response.json();
 

@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import formatPrice from '../utils/formatPrice';
 import './AccountPage.css';
 
-const API = 'https://pehnawafashionhub.onrender.com/api';
+const API = import.meta.env.VITE_API_URL;
 
 const STATUS_COLORS = {
     Pending: { bg: '#fef3c7', color: '#92400e' },
@@ -58,7 +58,7 @@ const AccountPage = () => {
         setSaving(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('https://pehnawafashionhub.onrender.com/api/auth/profile', {
+            const res = await fetch(`\${API}/auth/profile`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

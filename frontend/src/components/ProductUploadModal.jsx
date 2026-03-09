@@ -16,7 +16,7 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const API_BASE_URL = 'https://pehnawafashionhub.onrender.com/api';
+    const API_BASE_URL = import.meta.env.VITE_API_URL;
 
     const categories = ['Anarkalis', 'Coord Sets', 'Lehangas', 'Indo Western', 'Suits & Kurtis', 'Sarees', 'Blouses', 'Kidswear', "Men's Kurta", 'Dupattas', 'Pashminas'];
     const specialTags = ['', 'New Arrival', 'Best Seller', 'Sale', 'Trending'];

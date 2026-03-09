@@ -5,7 +5,7 @@ import Footer from '../components/Footer';
 import formatPrice from '../utils/formatPrice';
 import './OrderDetailPage.css';
 
-const API = 'https://pehnawafashionhub.onrender.com/api';
+const API = import.meta.env.VITE_API_URL;
 
 const STATUS_COLORS = {
     Pending: { bg: '#fef3c7', color: '#92400e' },

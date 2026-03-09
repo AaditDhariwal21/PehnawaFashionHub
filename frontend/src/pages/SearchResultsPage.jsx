@@ -26,7 +26,7 @@ const SearchResultsPage = () => {
                 setLoading(true);
                 setError(null);
                 const res = await fetch(
-                    `https://pehnawafashionhub.onrender.com/api/products/search?q=${encodeURIComponent(query)}`
+                    `\${import.meta.env.VITE_API_URL}/products/search?q=${encodeURIComponent(query)}`
                 );
                 const data = await res.json();
 
