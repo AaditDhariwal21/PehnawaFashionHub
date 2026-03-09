@@ -16,7 +16,7 @@ const NewArrivalsSection = () => {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const response = await fetch(`\${import.meta.env.VITE_API_URL}/products/tag/New Arrival`);
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/products/tag/New Arrival`);
                 const data = await response.json();
                 if (data.success) {
                     setProducts(data.products);
