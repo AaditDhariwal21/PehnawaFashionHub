@@ -4,7 +4,11 @@ dotenv.config();
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
+import morgan from "morgan";
+
 import connectDB from "./config/db.js";
+
 import authRoutes from "./routes/AuthRoute.js";
 import adminRoutes from "./routes/AdminRoute.js";
 import productRoutes from "./routes/ProductRoute.js";
@@ -14,26 +18,41 @@ import shippingRoutes from "./routes/shippingRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
 
-connectDB();
-
 const app = express();
 
-app.use(cors({
-    origin: [
-        process.env.FRONTEND_URL,
-        "https://pehnawa-fashion-hub.vercel.app",
-        "http://localhost:5173"
-    ],
-    credentials: true
-}));
+/* ---------------- Security + Logging ---------------- */
+
+app.use(helmet());
+app.use(morgan("dev"));
+
+/* ---------------- CORS ---------------- */
+
+app.use(
+    cors({
+        origin: [
+            "https://pehnawa-fashion-hub.vercel.app",
+            "http://localhost:5173",
+        ],
+        credentials: true,
+    })
+);
+
 app.use(cookieParser());
 
-// Webhook route MUST come before express.json() — needs raw body for signature verification
-app.use("/api/webhooks/square", express.raw({ type: "application/json" }), webhookRoutes);
+/* ---------------- Webhook (must be before express.json) ---------------- */
+
+app.use(
+    "/api/webhooks/square",
+    express.raw({ type: "application/json" }),
+    webhookRoutes
+);
+
+/* ---------------- Body Parser ---------------- */
 
 app.use(express.json());
 
-// Routes
+/* ---------------- Routes ---------------- */
+
 app.use("/api/auth", authRoutes);
 app.use("/api/adminDashboard", adminRoutes);
 app.use("/api/adminDashboard/upload", uploadRoutes);
@@ -42,9 +61,11 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/shipping", shippingRoutes);
 app.use("/api/payments", paymentRoutes);
 
-// Global error handler for multer/cloudinary errors
+/* ---------------- Global Error Handler ---------------- */
+
 app.use((err, req, res, next) => {
     console.error("Global Error Handler:", err);
+
     res.status(err.status || 500).json({
         success: false,
         message: err.message || "Internal Server Error",
@@ -52,7 +73,21 @@ app.use((err, req, res, next) => {
     });
 });
 
+/* ---------------- Start Server ---------------- */
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+
+const startServer = async () => {
+    try {
+        await connectDB();
+
+        app.listen(PORT, () => {
+            console.log(`Server running on port ${PORT}`);
+        });
+    } catch (error) {
+        console.error("Server failed to start:", error);
+        process.exit(1);
+    }
+};
+
+startServer();
