@@ -1,5 +1,19 @@
 import mongoose from "mongoose";
 
+const addressSchema = new mongoose.Schema(
+    {
+        fullName: { type: String, default: "" },
+        phone: { type: String, default: "" },
+        addressLine1: { type: String, default: "" },
+        addressLine2: { type: String, default: "" },
+        city: { type: String, default: "" },
+        state: { type: String, default: "" },
+        zip: { type: String, default: "" },
+        country: { type: String, default: "United States" },
+    },
+    { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
     {
         name: {
@@ -32,6 +46,10 @@ const userSchema = new mongoose.Schema(
         phone: {
             type: String,
             default: null,
+        },
+        address: {
+            type: addressSchema,
+            default: () => ({}),
         },
     },
     { timestamps: true }

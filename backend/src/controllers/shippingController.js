@@ -19,8 +19,8 @@ export const calculateShippingRate = async (req, res) => {
             });
         }
 
-        /* ── Calculate total cart weight from product records ── */
-        let totalWeightGrams = 0;
+        /* ── Calculate total cart weight from product records (in lbs) ── */
+        let totalWeightLbs = 0;
 
         if (Array.isArray(cartItems) && cartItems.length > 0) {
             const productIds = cartItems.map((ci) => ci.productId);
@@ -36,13 +36,13 @@ export const calculateShippingRate = async (req, res) => {
 
             for (const ci of cartItems) {
                 const w = weightMap[ci.productId] || 0;
-                totalWeightGrams += w * (ci.quantity || 1);
+                totalWeightLbs += w * (ci.quantity || 1);
             }
         }
 
         const rate = await getShippingRate(
             { name, phone, address, city, state, zip },
-            totalWeightGrams
+            totalWeightLbs
         );
 
         return res.json({

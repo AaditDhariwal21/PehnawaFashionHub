@@ -24,7 +24,7 @@ const PARCEL_TEMPLATES = {
         height: "4",
         distanceUnit: "in",
         massUnit: "lb",
-        maxWeightGrams: 1000,
+        maxWeightLbs: 2.2,
     },
     MEDIUM: {
         length: "12",
@@ -32,7 +32,7 @@ const PARCEL_TEMPLATES = {
         height: "5",
         distanceUnit: "in",
         massUnit: "lb",
-        maxWeightGrams: 3000,
+        maxWeightLbs: 6.6,
     },
     LARGE: {
         length: "14",
@@ -40,18 +40,16 @@ const PARCEL_TEMPLATES = {
         height: "6",
         distanceUnit: "in",
         massUnit: "lb",
-        maxWeightGrams: Infinity,
+        maxWeightLbs: Infinity,
     },
 };
 
-const GRAMS_PER_POUND = 453.592;
-
 /**
- * Select the right parcel template based on total weight in grams.
+ * Select the right parcel template based on total weight in lbs.
  */
-const selectParcelTemplate = (totalWeightGrams) => {
-    if (totalWeightGrams <= PARCEL_TEMPLATES.SMALL.maxWeightGrams) return PARCEL_TEMPLATES.SMALL;
-    if (totalWeightGrams <= PARCEL_TEMPLATES.MEDIUM.maxWeightGrams) return PARCEL_TEMPLATES.MEDIUM;
+const selectParcelTemplate = (totalWeightLbs) => {
+    if (totalWeightLbs <= PARCEL_TEMPLATES.SMALL.maxWeightLbs) return PARCEL_TEMPLATES.SMALL;
+    if (totalWeightLbs <= PARCEL_TEMPLATES.MEDIUM.maxWeightLbs) return PARCEL_TEMPLATES.MEDIUM;
     return PARCEL_TEMPLATES.LARGE;
 };
 
@@ -68,18 +66,18 @@ try {
  * Falls back to a flat $8 rate on any error.
  *
  * @param {{ name: string, phone: string, address: string, city: string, state: string, zip: string }} addressTo
- * @param {number} totalWeightGrams - total cart weight in grams
+ * @param {number} totalWeightLbs - total cart weight in lbs
  * @returns {Promise<{ shippingCost: number, service: string, estimatedDays: number|null }>}
  */
-export const getShippingRate = async (addressTo, totalWeightGrams = 0) => {
+export const getShippingRate = async (addressTo, totalWeightLbs = 0) => {
     if (!shippo) {
         console.error("Shippo SDK not initialised — returning fallback rate.");
         return FALLBACK_RATE;
     }
 
     /* Select parcel template based on weight */
-    const template = selectParcelTemplate(totalWeightGrams);
-    const weightLbs = Math.max(0.1, totalWeightGrams / GRAMS_PER_POUND);
+    const template = selectParcelTemplate(totalWeightLbs);
+    const weightLbs = Math.max(0.1, totalWeightLbs);
 
     const parcel = {
         length: template.length,

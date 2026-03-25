@@ -36,7 +36,7 @@ const productSchema = new mongoose.Schema(
             default: 0,
         },
         weight: {
-            type: Number, // grams – approximate folded garment weight for shipping
+            type: Number, // lbs – standard US weight unit for shipping
             required: true,
         },
         specialTag: {

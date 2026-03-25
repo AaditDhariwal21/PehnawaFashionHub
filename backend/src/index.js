@@ -17,6 +17,7 @@ import orderRoutes from "./routes/OrderRoutes.js";
 import shippingRoutes from "./routes/shippingRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
+import userRoutes from "./routes/UserRoute.js";
 
 const app = express();
 
@@ -60,6 +61,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/shipping", shippingRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/users", userRoutes);
 
 /* ---------------- Global Error Handler ---------------- */
 

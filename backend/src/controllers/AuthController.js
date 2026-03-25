@@ -58,6 +58,7 @@ export const signup = async (req, res) => {
                 email: newUser.email,
                 role: newUser.role,
                 phone: newUser.phone,
+                address: newUser.address || {},
             },
             token,
         });
@@ -119,6 +120,7 @@ export const login = async (req, res) => {
                 email: user.email,
                 role: user.role,
                 phone: user.phone,
+                address: user.address || {},
             },
             token,
         });
@@ -159,6 +161,7 @@ export const updateProfile = async (req, res) => {
                 email: user.email,
                 role: user.role,
                 phone: user.phone,
+                address: user.address || {},
             },
         });
     } catch (error) {
@@ -242,6 +245,7 @@ export const googleLogin = async (req, res) => {
                 role: user.role,
                 phone: user.phone,
                 profilePicture: user.profilePicture,
+                address: user.address || {},
             },
         });
     } catch (error) {
