@@ -22,12 +22,26 @@ const AccountPage = () => {
     const { user, logout, updateUser } = useAuth();
     const [activeTab, setActiveTab] = useState('info');
 
-    // Form state
+    // Form state – personal info
     const [name, setName] = useState(user?.name || '');
     const [phone, setPhone] = useState(user?.phone || '');
     const [email] = useState(user?.email || '');
+
+    // Form state – address
+    const [address, setAddress] = useState({
+        fullName: '',
+        phone: '',
+        addressLine1: '',
+        addressLine2: '',
+        city: '',
+        state: '',
+        zip: '',
+        country: 'United States',
+    });
+
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [saveError, setSaveError] = useState('');
 
     // Orders state
     const [orders, setOrders] = useState([]);
@@ -39,6 +53,38 @@ const AccountPage = () => {
         navigate('/signin');
         return null;
     }
+
+    /* Fetch full profile (including address) on mount */
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        fetch(`${API}/users/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then((r) => r.json())
+            .then((data) => {
+                if (data.success && data.user) {
+                    const u = data.user;
+                    if (u.name) setName(u.name);
+                    if (u.phone) setPhone(u.phone);
+                    if (u.address) {
+                        setAddress((prev) => ({
+                            ...prev,
+                            fullName: u.address.fullName || '',
+                            phone: u.address.phone || '',
+                            addressLine1: u.address.addressLine1 || '',
+                            addressLine2: u.address.addressLine2 || '',
+                            city: u.address.city || '',
+                            state: u.address.state || '',
+                            zip: u.address.zip || '',
+                            country: u.address.country || 'United States',
+                        }));
+                    }
+                }
+            })
+            .catch(console.error);
+    }, []);
 
     /* Fetch orders when tab switches to 'orders' */
     useEffect(() => {
@@ -54,11 +100,19 @@ const AccountPage = () => {
             .finally(() => { setOrdersLoading(false); setOrdersFetched(true); });
     }, [activeTab, ordersFetched]);
 
+    const handleAddressChange = (e) => {
+        const { name: field, value } = e.target;
+        setAddress((prev) => ({ ...prev, [field]: value }));
+    };
+
     const handleSave = async () => {
         setSaving(true);
+        setSaveError('');
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`\${API}/auth/profile`, {
+
+            // Save profile (name, phone)
+            const profileRes = await fetch(`${API}/auth/profile`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -66,14 +120,33 @@ const AccountPage = () => {
                 },
                 body: JSON.stringify({ name, phone }),
             });
-            const data = await res.json();
-            if (data.success) {
-                updateUser(data.user);
-                setSaved(true);
-                setTimeout(() => setSaved(false), 2500);
+            const profileData = await profileRes.json();
+
+            // Save address
+            const addressRes = await fetch(`${API}/users/address`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(address),
+            });
+            const addressData = await addressRes.json();
+
+            if (profileData.success) {
+                updateUser({ ...profileData.user, address: addressData.address || address });
             }
+
+            if (!profileData.success || !addressData.success) {
+                setSaveError(profileData.message || addressData.message || 'Something went wrong');
+                return;
+            }
+
+            setSaved(true);
+            setTimeout(() => setSaved(false), 2500);
         } catch (err) {
             console.error('Error updating profile:', err);
+            setSaveError('Network error. Please try again.');
         } finally {
             setSaving(false);
         }
@@ -136,8 +209,9 @@ const AccountPage = () => {
                     {activeTab === 'info' && (
                         <div className="account-info-panel">
                             <h1>Account Information</h1>
-                            <p className="account-info-sub">Manage your personal details</p>
+                            <p className="account-info-sub">Manage your personal details and shipping address</p>
 
+                            {/* ── Personal Details ── */}
                             <div className="account-fields">
                                 <div className="account-field">
                                     <label>Full Name</label>
@@ -168,6 +242,120 @@ const AccountPage = () => {
                                     <span className="field-hint">Email cannot be changed</span>
                                 </div>
                             </div>
+
+                            {/* ── Shipping Address ── */}
+                            <div className="account-address-section">
+                                <h2 className="account-address-heading">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                        <circle cx="12" cy="10" r="3" />
+                                    </svg>
+                                    Shipping Address
+                                </h2>
+                                <p className="account-address-hint">This address will be autofilled during checkout</p>
+
+                                <div className="account-fields">
+                                    <div className="account-field-row">
+                                        <div className="account-field">
+                                            <label>Full Name</label>
+                                            <input
+                                                type="text"
+                                                name="fullName"
+                                                value={address.fullName}
+                                                onChange={handleAddressChange}
+                                                placeholder="Recipient full name"
+                                            />
+                                        </div>
+                                        <div className="account-field">
+                                            <label>Phone Number</label>
+                                            <input
+                                                type="tel"
+                                                name="phone"
+                                                value={address.phone}
+                                                onChange={handleAddressChange}
+                                                placeholder="+1 (555) 000-0000"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="account-field">
+                                        <label>Address Line 1</label>
+                                        <input
+                                            type="text"
+                                            name="addressLine1"
+                                            value={address.addressLine1}
+                                            onChange={handleAddressChange}
+                                            placeholder="123 Main Street"
+                                        />
+                                    </div>
+
+                                    <div className="account-field">
+                                        <label>Address Line 2 <span className="field-hint-inline">(optional)</span></label>
+                                        <input
+                                            type="text"
+                                            name="addressLine2"
+                                            value={address.addressLine2}
+                                            onChange={handleAddressChange}
+                                            placeholder="Apt, Suite, Unit, etc."
+                                        />
+                                    </div>
+
+                                    <div className="account-field-row">
+                                        <div className="account-field">
+                                            <label>City</label>
+                                            <input
+                                                type="text"
+                                                name="city"
+                                                value={address.city}
+                                                onChange={handleAddressChange}
+                                                placeholder="New York"
+                                            />
+                                        </div>
+                                        <div className="account-field">
+                                            <label>State</label>
+                                            <input
+                                                type="text"
+                                                name="state"
+                                                value={address.state}
+                                                onChange={handleAddressChange}
+                                                placeholder="NY"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="account-field-row">
+                                        <div className="account-field">
+                                            <label>ZIP Code</label>
+                                            <input
+                                                type="text"
+                                                name="zip"
+                                                value={address.zip}
+                                                onChange={handleAddressChange}
+                                                placeholder="10001"
+                                            />
+                                        </div>
+                                        <div className="account-field">
+                                            <label>Country</label>
+                                            <select
+                                                name="country"
+                                                value={address.country}
+                                                onChange={handleAddressChange}
+                                                className="account-select"
+                                            >
+                                                <option>United States</option>
+                                                <option>Canada</option>
+                                                <option>United Kingdom</option>
+                                                <option>India</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── Save + Feedback ── */}
+                            {saveError && (
+                                <div className="account-save-error">{saveError}</div>
+                            )}
 
                             <div className="account-actions">
                                 <button className="btn-save" onClick={handleSave} disabled={saving}>

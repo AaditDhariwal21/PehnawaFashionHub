@@ -174,6 +174,73 @@
     margin-top: 0.3rem;
 }
 
+.field-hint-inline {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    font-weight: 400;
+}
+
+/* --- Address Section --- */
+.account-address-section {
+    margin-top: 2.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid #f3f4f6;
+}
+
+.account-address-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 0.3rem;
+}
+
+.account-address-hint {
+    font-size: 0.82rem;
+    color: #9ca3af;
+    margin: 0 0 1.5rem;
+}
+
+.account-field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.account-select {
+    width: 100%;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    color: #111827;
+    background: #fff;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    font-family: inherit;
+    outline: none;
+    box-sizing: border-box;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.account-select:focus {
+    border-color: #EFBF04;
+    box-shadow: 0 0 0 3px rgba(239, 191, 4, 0.12);
+}
+
+.account-save-error {
+    margin-top: 1rem;
+    padding: 0.6rem 1rem;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 0.5rem;
+    font-size: 0.85rem;
+    color: #dc2626;
+}
+
 /* --- Action buttons --- */
 .account-actions {
     margin-top: 1.75rem;
@@ -443,5 +510,9 @@
 
     .account-content h1 {
         font-size: 1.3rem;
+    }
+
+    .account-field-row {
+        grid-template-columns: 1fr;
     }
 }

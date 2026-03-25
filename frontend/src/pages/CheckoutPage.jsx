@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Lock, Loader2 } from 'lucide-react';
 import Navbar from '../components/Navbar';
@@ -45,6 +45,7 @@ const CheckoutPage = () => {
 
     /* ── Abort controller ref to cancel in-flight requests ── */
     const abortRef = useRef(null);
+    const autofilled = useRef(false);
 
     const [form, setForm] = useState({
         fullName: '',
@@ -56,6 +57,38 @@ const CheckoutPage = () => {
         zip: '',
         country: 'United States',
     });
+
+    /* ── Autofill from saved address ── */
+    useEffect(() => {
+        if (!user || autofilled.current) return;
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        fetch(`${API}/users/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then((r) => r.json())
+            .then((data) => {
+                if (!data.success || !data.user?.address) return;
+                const addr = data.user.address;
+                // Only autofill if the form hasn't been manually edited
+                setForm((prev) => ({
+                    fullName: prev.fullName || addr.fullName || '',
+                    contactNumber: prev.contactNumber || addr.phone || '',
+                    street: prev.street || addr.addressLine1 || '',
+                    apartment: prev.apartment || addr.addressLine2 || '',
+                    city: prev.city || addr.city || '',
+                    state: prev.state || addr.state || '',
+                    zip: prev.zip || addr.zip || '',
+                    country: prev.country || addr.country || 'United States',
+                }));
+                autofilled.current = true;
+            })
+            .catch((err) => {
+                console.error('Address autofill error:', err);
+                // Graceful fallback: keep fields empty
+            });
+    }, [user]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;

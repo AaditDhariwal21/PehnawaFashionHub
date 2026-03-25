@@ -23,6 +23,7 @@ import OrderConfirmationPage from './pages/OrderConfirmationPage';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import CartDrawer from './components/CartDrawer';
+import AdminToggleButton from './components/AdminToggleButton';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
       <AuthProvider>
         <CartProvider>
           <CartDrawer />
+          <AdminToggleButton />
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/signin" element={<SignInPage />} />

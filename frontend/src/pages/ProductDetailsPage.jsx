@@ -264,7 +264,7 @@ const ProductDetailsPage = () => {
                                     color: '#6b7280',
                                 }}
                             >
-                                Weight: <span style={{ fontWeight: 600, color: '#374151' }}>{product.weight}g</span>
+                                Weight: <span style={{ fontWeight: 600, color: '#374151' }}>{product.weight} lbs</span>
                             </p>
                         )}
 

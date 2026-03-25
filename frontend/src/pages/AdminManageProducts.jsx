@@ -384,15 +384,16 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
                             </p>
                             <div>
                                 <label className={labelStyles}>
-                                    Weight (grams) <span className="text-red-500">*</span>
+                                    Weight (lbs) <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="number"
                                     name="weight"
                                     value={formData.weight}
                                     onChange={handleInputChange}
-                                    placeholder="e.g. 300 for a kurti, 600 for a saree"
-                                    min="1"
+                                    placeholder="e.g. 0.66 for a kurti, 1.32 for a saree"
+                                    min="0.01"
+                                    step="0.01"
                                     className={inputStyles}
                                     style={inputPadding}
                                 />

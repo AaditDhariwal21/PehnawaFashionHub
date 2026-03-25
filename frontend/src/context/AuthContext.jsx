@@ -17,18 +17,23 @@ export const AuthProvider = ({ children }) => {
         return null;
     });
 
+    /* ── View Mode: "admin" | "customer" (UI-only, never touches auth) ── */
+    const [viewMode, setViewMode] = useState('admin');
+
     const login = (userData, token) => {
         localStorage.setItem('user', JSON.stringify(userData));
         if (token) {
             localStorage.setItem('token', token);
         }
         setUser(userData);
+        setViewMode('admin'); // always reset to admin view on login
     };
 
     const logout = () => {
         localStorage.removeItem('user');
         localStorage.removeItem('token');
         setUser(null);
+        setViewMode('admin'); // reset view mode on logout
     };
 
     const updateUser = (updates) => {
@@ -37,8 +42,23 @@ export const AuthProvider = ({ children }) => {
         setUser(updated);
     };
 
+    /**
+     * True when an admin is previewing the customer site.
+     * Components should check this to disable cart/checkout actions.
+     */
+    const isAdminPreview = user?.role === 'admin' && viewMode === 'customer';
+
     return (
-        <AuthContext.Provider value={{ user, isLoggedIn: !!user, login, logout, updateUser }}>
+        <AuthContext.Provider value={{
+            user,
+            isLoggedIn: !!user,
+            login,
+            logout,
+            updateUser,
+            viewMode,
+            setViewMode,
+            isAdminPreview,
+        }}>
             {children}
         </AuthContext.Provider>
     );
