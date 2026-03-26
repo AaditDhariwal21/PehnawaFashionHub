@@ -174,6 +174,17 @@ export const updateProfile = async (req, res) => {
     }
 };
 
+// Logout - Clear httpOnly cookie
+export const logoutUser = async (req, res) => {
+    res.cookie("token", "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        maxAge: 0,
+    });
+    res.status(200).json({ success: true, message: "Logged out successfully" });
+};
+
 // Google Login - Authenticate via Google ID token
 export const googleLogin = async (req, res) => {
     try {

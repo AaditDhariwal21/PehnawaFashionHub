@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(() => {
         const stored = localStorage.getItem('user');
@@ -30,10 +32,20 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = () => {
+        // Clear all auth storage
         localStorage.removeItem('user');
         localStorage.removeItem('token');
+        sessionStorage.clear();
+
+        // Clear httpOnly cookie via backend (fire-and-forget)
+        fetch(`${API_BASE_URL}/auth/logout`, {
+            method: 'POST',
+            credentials: 'include',
+        }).catch(() => {});
+
+        // Reset all auth state
         setUser(null);
-        setViewMode('admin'); // reset view mode on logout
+        setViewMode('admin');
     };
 
     const updateUser = (updates) => {

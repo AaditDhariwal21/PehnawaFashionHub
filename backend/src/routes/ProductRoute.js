@@ -7,6 +7,7 @@ import {
     createProduct,
     updateProduct,
     deleteProduct,
+    bulkDeleteProducts,
     searchProducts,
     getCategoryCovers,
 } from "../controllers/ProductController.js";
@@ -24,6 +25,7 @@ router.get("/:id", getProductById);
 
 // Admin only routes (requires authentication + admin role)
 router.post("/", verifyToken, isAdmin, createProduct);
+router.delete("/bulk", verifyToken, isAdmin, bulkDeleteProducts);
 router.put("/:id", verifyToken, isAdmin, updateProduct);
 router.delete("/:id", verifyToken, isAdmin, deleteProduct);
 

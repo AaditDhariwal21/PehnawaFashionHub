@@ -1,5 +1,13 @@
 import mongoose from "mongoose";
 
+const sizeEntrySchema = new mongoose.Schema(
+    {
+        size: { type: String, required: true },
+        stock: { type: Number, required: true, min: 0 },
+    },
+    { _id: false }
+);
+
 const productSchema = new mongoose.Schema(
     {
         name: {
@@ -31,7 +39,8 @@ const productSchema = new mongoose.Schema(
                 },
             },
         ],
-        stock: {
+        sizes: [sizeEntrySchema],
+        totalStock: {
             type: Number,
             default: 0,
         },
@@ -50,5 +59,12 @@ const productSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
+/* Recompute totalStock from sizes before every save */
+productSchema.pre("save", function () {
+    if (this.sizes && this.sizes.length > 0) {
+        this.totalStock = this.sizes.reduce((sum, s) => sum + s.stock, 0);
+    }
+});
 
 export default mongoose.model("Product", productSchema);

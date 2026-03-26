@@ -21,7 +21,7 @@ export const getAdminDashboard = async (req, res) => {
 // Create New Product (Admin only)
 export const createNewProduct = async (req, res) => {
     try {
-        const { name, description, price, category, stock, specialTag, weight, isCategoryCover } = req.body;
+        const { name, description, price, category, specialTag, weight, isCategoryCover } = req.body;
 
         // Validate required fields
         if (!name || !description || !price || !category || !weight) {
@@ -30,6 +30,27 @@ export const createNewProduct = async (req, res) => {
                 message: "Please provide name, description, price, category, and weight",
             });
         }
+
+        // Parse sizes (sent as JSON string from FormData)
+        let sizes = [];
+        if (req.body.sizes) {
+            try {
+                sizes = JSON.parse(req.body.sizes);
+            } catch {
+                return res.status(400).json({ success: false, message: "Invalid sizes format." });
+            }
+        }
+
+        // Validate sizes: no duplicates, no negative stock
+        const sizeNames = sizes.map((s) => s.size);
+        if (new Set(sizeNames).size !== sizeNames.length) {
+            return res.status(400).json({ success: false, message: "Duplicate sizes are not allowed." });
+        }
+        if (sizes.some((s) => s.stock < 0)) {
+            return res.status(400).json({ success: false, message: "Stock cannot be negative." });
+        }
+
+        const totalStock = sizes.reduce((sum, s) => sum + (Number(s.stock) || 0), 0);
 
         const categoryCover = isCategoryCover === "true" || isCategoryCover === true;
 
@@ -56,7 +77,8 @@ export const createNewProduct = async (req, res) => {
             price: Number(price),
             category,
             images,
-            stock: stock ? Number(stock) : 0,
+            sizes,
+            totalStock,
             weight: Number(weight),
             specialTag: specialTag || null,
             isCategoryCover: categoryCover,

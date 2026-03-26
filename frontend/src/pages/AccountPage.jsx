@@ -153,8 +153,8 @@ const AccountPage = () => {
     };
 
     const handleLogout = () => {
-        navigate('/');
         logout();
+        navigate('/');
     };
 
     const getInitials = () => {

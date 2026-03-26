@@ -16,8 +16,6 @@ const ProductDetailsPage = () => {
     const [selectedImage, setSelectedImage] = useState(0);
     const [selectedSize, setSelectedSize] = useState(null);
 
-    const sizes = ['S', 'M', 'L', 'XL'];
-
     useEffect(() => {
         const fetchProduct = async () => {
             try {
@@ -234,21 +232,21 @@ const ProductDetailsPage = () => {
 
 
                         {/* Stock */}
-                        {product.stock !== undefined && (
+                        {product.totalStock !== undefined && (
                             <p
                                 className="text-sm"
                                 style={{
                                     marginBottom: '1.5rem',
-                                    color: product.stock === 0 ? '#ef4444' : '#6b7280',
+                                    color: product.totalStock === 0 ? '#ef4444' : '#6b7280',
                                 }}
                             >
-                                {product.stock === 0 ? (
+                                {product.totalStock === 0 ? (
                                     'Out of Stock'
                                 ) : (
                                     <>
                                         In Stock —{' '}
-                                        <span style={{ color: product.stock > 3 ? '#16a34a' : '#ef4444', fontWeight: 600 }}>
-                                            {product.stock} left
+                                        <span style={{ color: product.totalStock > 3 ? '#16a34a' : '#ef4444', fontWeight: 600 }}>
+                                            {product.totalStock} left
                                         </span>
                                     </>
                                 )}
@@ -272,41 +270,55 @@ const ProductDetailsPage = () => {
                         <hr className="border-gray-100" style={{ marginBottom: '1.5rem' }} />
 
                         {/* Size Selector */}
-                        <div style={{ marginBottom: '2rem' }}>
-                            <p
-                                className="font-bold text-gray-900 uppercase tracking-wide"
-                                style={{ fontSize: '0.85rem', marginBottom: '0.85rem' }}
-                            >
-                                Select Size
-                            </p>
-                            <div className="flex gap-3 flex-wrap">
-                                {sizes.map((size) => (
-                                    <button
-                                        key={size}
-                                        onClick={() => setSelectedSize(size)}
-                                        className="font-semibold transition-all duration-200 cursor-pointer"
-                                        style={{
-                                            width: '3rem',
-                                            height: '3rem',
-                                            borderRadius: '50%',
-                                            fontSize: '0.85rem',
-                                            border: selectedSize === size
-                                                ? '2px solid #EFBF04'
-                                                : '1.5px solid #d1d5db',
-                                            backgroundColor: selectedSize === size
-                                                ? '#EFBF04'
-                                                : 'transparent',
-                                            color: selectedSize === size
-                                                ? '#ffffff'
-                                                : '#374151',
-                                            transform: selectedSize === size ? 'scale(1.1)' : 'scale(1)',
-                                        }}
-                                    >
-                                        {size}
-                                    </button>
-                                ))}
+                        {product.sizes && product.sizes.length > 0 && (
+                            <div style={{ marginBottom: '2rem' }}>
+                                <p
+                                    className="font-bold text-gray-900 uppercase tracking-wide"
+                                    style={{ fontSize: '0.85rem', marginBottom: '0.85rem' }}
+                                >
+                                    Select Size
+                                </p>
+                                <div className="flex gap-3 flex-wrap">
+                                    {product.sizes.map((sizeEntry) => {
+                                        const outOfStock = sizeEntry.stock === 0;
+                                        const isSelected = selectedSize === sizeEntry.size;
+                                        return (
+                                            <button
+                                                key={sizeEntry.size}
+                                                onClick={() => !outOfStock && setSelectedSize(sizeEntry.size)}
+                                                disabled={outOfStock}
+                                                className="font-semibold transition-all duration-200"
+                                                style={{
+                                                    width: '3rem',
+                                                    height: '3rem',
+                                                    borderRadius: '50%',
+                                                    fontSize: '0.85rem',
+                                                    border: isSelected
+                                                        ? '2px solid #EFBF04'
+                                                        : '1.5px solid #d1d5db',
+                                                    backgroundColor: outOfStock
+                                                        ? '#f3f4f6'
+                                                        : isSelected
+                                                            ? '#EFBF04'
+                                                            : 'transparent',
+                                                    color: outOfStock
+                                                        ? '#9ca3af'
+                                                        : isSelected
+                                                            ? '#ffffff'
+                                                            : '#374151',
+                                                    transform: isSelected ? 'scale(1.1)' : 'scale(1)',
+                                                    cursor: outOfStock ? 'not-allowed' : 'pointer',
+                                                    opacity: outOfStock ? 0.5 : 1,
+                                                    textDecoration: outOfStock ? 'line-through' : 'none',
+                                                }}
+                                            >
+                                                {sizeEntry.size}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Action Buttons */}
                         <div className="flex flex-col gap-3" style={{ marginBottom: '2rem' }}>
@@ -317,7 +329,7 @@ const ProductDetailsPage = () => {
                                         alert('Please select a size before proceeding.');
                                         return;
                                     }
-                                    if (product.stock !== undefined && product.stock === 0) {
+                                    if (product.totalStock !== undefined && product.totalStock === 0) {
                                         alert('This product is currently out of stock.');
                                         return;
                                     }
@@ -331,17 +343,17 @@ const ProductDetailsPage = () => {
                                     });
                                     navigate('/checkout');
                                 }}
-                                disabled={product.stock !== undefined && product.stock === 0}
+                                disabled={product.totalStock !== undefined && product.totalStock === 0}
                                 className="w-full font-bold uppercase tracking-wider text-white rounded-lg transition-all duration-200 cursor-pointer hover:shadow-lg active:scale-[0.98]"
                                 style={{
                                     padding: '1rem',
                                     fontSize: '0.9rem',
-                                    background: (product.stock !== undefined && product.stock === 0)
+                                    background: (product.totalStock !== undefined && product.totalStock === 0)
                                         ? '#d1d5db'
                                         : 'linear-gradient(135deg, #EFBF04, #d4a904)',
                                     letterSpacing: '0.08em',
-                                    cursor: (product.stock !== undefined && product.stock === 0) ? 'not-allowed' : 'pointer',
-                                    opacity: (product.stock !== undefined && product.stock === 0) ? 0.6 : 1,
+                                    cursor: (product.totalStock !== undefined && product.totalStock === 0) ? 'not-allowed' : 'pointer',
+                                    opacity: (product.totalStock !== undefined && product.totalStock === 0) ? 0.6 : 1,
                                 }}
                             >
                                 Buy Now

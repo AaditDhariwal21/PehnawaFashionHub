@@ -1,35 +1,29 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import ProductUploadModal from '../components/ProductUploadModal';
 
 const AdminDashboard = () => {
-    const [user, setUser] = useState(null);
+    const { user, isLoggedIn, logout } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Check if user is authenticated and is admin
-        const token = localStorage.getItem('token');
-        const storedUser = localStorage.getItem('user');
-
-        if (!token || !storedUser) {
-            navigate('/signin');
-            return;
-        }
-
-        const parsedUser = JSON.parse(storedUser);
-        if (parsedUser.role !== 'admin') {
+        // Only redirect to signin on initial load when not logged in.
+        // During logout, handleLogout navigates to '/' directly.
+        if (!isLoggedIn && !user) {
             navigate('/');
             return;
         }
-
-        setUser(parsedUser);
-    }, [navigate]);
+        if (user && user.role !== 'admin') {
+            navigate('/');
+            return;
+        }
+    }, [isLoggedIn, user, navigate]);
 
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        logout();
         navigate('/');
     };
 
@@ -38,7 +32,7 @@ const AdminDashboard = () => {
         setTimeout(() => setSuccessMessage(''), 5000);
     };
 
-    if (!user) {
+    if (!user || user.role !== 'admin') {
         return (
             <div className="w-full h-screen flex items-center justify-center" style={{ backgroundColor: '#F5F5F5' }}>
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2" style={{ borderColor: '#EFBF04' }}></div>

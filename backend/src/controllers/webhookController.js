@@ -99,7 +99,15 @@ export const handleSquareWebhook = async (req, res) => {
                 return res.status(200).send("OK");
             }
 
-            if (product.stock != null && product.stock < ci.quantity) {
+            const requestedSize = ci.size || "";
+
+            if (product.sizes && product.sizes.length > 0 && requestedSize) {
+                const sizeEntry = product.sizes.find((s) => s.size === requestedSize);
+                if (!sizeEntry || sizeEntry.stock < ci.quantity) {
+                    console.error(`[Webhook] Insufficient stock for "${product.name}" (${requestedSize}).`);
+                    return res.status(200).send("OK");
+                }
+            } else if (product.totalStock != null && product.totalStock < ci.quantity) {
                 console.error(`[Webhook] Insufficient stock for "${product.name}".`);
                 return res.status(200).send("OK");
             }
@@ -108,16 +116,21 @@ export const handleSquareWebhook = async (req, res) => {
                 product,
                 qty: ci.quantity,
                 image: ci.image,
-                size: ci.size,
+                size: requestedSize,
             });
         }
 
-        /* ── 9. Deduct stock ── */
+        /* ── 9. Deduct stock per size ── */
         for (const r of resolved) {
-            if (r.product.stock != null) {
+            if (r.product.sizes && r.product.sizes.length > 0 && r.size) {
+                await Product.updateOne(
+                    { _id: r.product._id, "sizes.size": r.size },
+                    { $inc: { "sizes.$.stock": -r.qty, totalStock: -r.qty } }
+                );
+            } else if (r.product.totalStock != null) {
                 await Product.updateOne(
                     { _id: r.product._id },
-                    { $inc: { stock: -r.qty } }
+                    { $inc: { totalStock: -r.qty } }
                 );
             }
         }

@@ -19,7 +19,7 @@ export const createOrder = async (req, res) => {
             return res.status(400).json({ success: false, message: "Shipping address is required." });
         }
 
-        /* ── Phase 1: Validate every product exists & has enough stock ── */
+        /* ── Phase 1: Validate every product exists & has enough stock for the requested size ── */
         const resolved = []; // { product, qty, serverPrice }
         let subtotal = 0;
 
@@ -33,17 +33,32 @@ export const createOrder = async (req, res) => {
             }
 
             const qty = Number(item.quantity) || 1;
+            const requestedSize = item.size || "";
 
-            /* Only enforce stock limits when product has stock tracking */
-            if (product.stock != null) {
-                if (product.stock < qty) {
+            /* Size-based stock validation */
+            if (product.sizes && product.sizes.length > 0 && requestedSize) {
+                const sizeEntry = product.sizes.find((s) => s.size === requestedSize);
+                if (!sizeEntry) {
                     return res.status(400).json({
                         success: false,
-                        message: product.stock === 0
-                            ? `"${product.name}" is out of stock.`
-                            : `Insufficient stock for "${product.name}". Available: ${product.stock}, Requested: ${qty}`,
+                        message: `Size "${requestedSize}" is not available for "${product.name}".`,
                     });
                 }
+                if (sizeEntry.stock < qty) {
+                    return res.status(400).json({
+                        success: false,
+                        message: sizeEntry.stock === 0
+                            ? `"${product.name}" (${requestedSize}) is out of stock.`
+                            : `Insufficient stock for "${product.name}" (${requestedSize}). Available: ${sizeEntry.stock}, Requested: ${qty}`,
+                    });
+                }
+            } else if (product.totalStock != null && product.totalStock < qty) {
+                return res.status(400).json({
+                    success: false,
+                    message: product.totalStock === 0
+                        ? `"${product.name}" is out of stock.`
+                        : `Insufficient stock for "${product.name}". Available: ${product.totalStock}, Requested: ${qty}`,
+                });
             }
 
             resolved.push({
@@ -51,17 +66,24 @@ export const createOrder = async (req, res) => {
                 qty,
                 serverPrice: product.price,
                 image: item.image || (product.images?.[0]?.url ?? ""),
-                size: item.size || "",
+                size: requestedSize,
             });
 
             subtotal += product.price * qty;
         }
 
-        /* ── Phase 2: Deduct stock for every item (only if stock is tracked) ── */
+        /* ── Phase 2: Deduct stock per size and recompute totalStock ── */
         for (const r of resolved) {
-            if (r.product.stock != null) {
-                r.product.stock -= r.qty;
-                await r.product.save();
+            if (r.product.sizes && r.product.sizes.length > 0 && r.size) {
+                await Product.updateOne(
+                    { _id: r.product._id, "sizes.size": r.size },
+                    { $inc: { "sizes.$.stock": -r.qty, totalStock: -r.qty } }
+                );
+            } else if (r.product.totalStock != null) {
+                await Product.updateOne(
+                    { _id: r.product._id },
+                    { $inc: { totalStock: -r.qty } }
+                );
             }
         }
 

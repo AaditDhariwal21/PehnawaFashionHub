@@ -45,13 +45,27 @@ export const createCheckoutSession = async (req, res) => {
             }
 
             const qty = Number(ci.quantity) || 1;
+            const requestedSize = ci.size || "";
 
-            if (product.stock != null && product.stock < qty) {
+            /* Size-based stock validation */
+            if (product.sizes && product.sizes.length > 0 && requestedSize) {
+                const sizeEntry = product.sizes.find((s) => s.size === requestedSize);
+                if (!sizeEntry || sizeEntry.stock < qty) {
+                    return res.status(400).json({
+                        success: false,
+                        message: !sizeEntry
+                            ? `Size "${requestedSize}" not available for "${product.name}".`
+                            : sizeEntry.stock === 0
+                                ? `"${product.name}" (${requestedSize}) is out of stock.`
+                                : `Insufficient stock for "${product.name}" (${requestedSize}). Available: ${sizeEntry.stock}, Requested: ${qty}`,
+                    });
+                }
+            } else if (product.totalStock != null && product.totalStock < qty) {
                 return res.status(400).json({
                     success: false,
-                    message: product.stock === 0
+                    message: product.totalStock === 0
                         ? `"${product.name}" is out of stock.`
-                        : `Insufficient stock for "${product.name}". Available: ${product.stock}, Requested: ${qty}`,
+                        : `Insufficient stock for "${product.name}". Available: ${product.totalStock}, Requested: ${qty}`,
                 });
             }
 
@@ -210,7 +224,17 @@ export const confirmPayment = async (req, res) => {
                 });
             }
 
-            if (product.stock != null && product.stock < ci.quantity) {
+            const requestedSize = ci.size || "";
+
+            if (product.sizes && product.sizes.length > 0 && requestedSize) {
+                const sizeEntry = product.sizes.find((s) => s.size === requestedSize);
+                if (!sizeEntry || sizeEntry.stock < ci.quantity) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Insufficient stock for "${product.name}" (${requestedSize}).`,
+                    });
+                }
+            } else if (product.totalStock != null && product.totalStock < ci.quantity) {
                 return res.status(400).json({
                     success: false,
                     message: `Insufficient stock for "${product.name}".`,
@@ -221,16 +245,21 @@ export const confirmPayment = async (req, res) => {
                 product,
                 qty: ci.quantity,
                 image: ci.image,
-                size: ci.size,
+                size: requestedSize,
             });
         }
 
-        /* ── 5. Deduct stock atomically (avoids re-validation of other fields) ── */
+        /* ── 5. Deduct stock per size atomically ── */
         for (const r of resolved) {
-            if (r.product.stock != null) {
+            if (r.product.sizes && r.product.sizes.length > 0 && r.size) {
+                await Product.updateOne(
+                    { _id: r.product._id, "sizes.size": r.size },
+                    { $inc: { "sizes.$.stock": -r.qty, totalStock: -r.qty } }
+                );
+            } else if (r.product.totalStock != null) {
                 await Product.updateOne(
                     { _id: r.product._id },
-                    { $inc: { stock: -r.qty } }
+                    { $inc: { totalStock: -r.qty } }
                 );
             }
         }

@@ -98,7 +98,7 @@ export const getProductsBySpecialTag = async (req, res) => {
 // Create product (Admin only)
 export const createProduct = async (req, res) => {
     try {
-        const { name, description, price, category, images, stock, specialTag, weight, isCategoryCover } = req.body;
+        const { name, description, price, category, images, sizes, specialTag, weight, isCategoryCover } = req.body;
 
         if (!name || !description || !price || !category || !weight) {
             return res.status(400).json({
@@ -106,6 +106,17 @@ export const createProduct = async (req, res) => {
                 message: "Please provide name, description, price, category, and weight",
             });
         }
+
+        // Validate sizes
+        const parsedSizes = sizes || [];
+        const sizeNames = parsedSizes.map((s) => s.size);
+        if (new Set(sizeNames).size !== sizeNames.length) {
+            return res.status(400).json({ success: false, message: "Duplicate sizes are not allowed." });
+        }
+        if (parsedSizes.some((s) => s.stock < 0)) {
+            return res.status(400).json({ success: false, message: "Stock cannot be negative." });
+        }
+        const totalStock = parsedSizes.reduce((sum, s) => sum + (Number(s.stock) || 0), 0);
 
         const categoryCover = isCategoryCover === true || isCategoryCover === "true";
 
@@ -123,7 +134,8 @@ export const createProduct = async (req, res) => {
             price,
             category,
             images: images || [],
-            stock: stock || 0,
+            sizes: parsedSizes,
+            totalStock,
             weight,
             specialTag: specialTag || null,
             isCategoryCover: categoryCover,
@@ -152,7 +164,6 @@ export const updateProduct = async (req, res) => {
         // If setting isCategoryCover to true, unset previous covers in that category
         if (req.body.isCategoryCover === true || req.body.isCategoryCover === "true") {
             const category = req.body.category;
-            // If category changed, use the new one; otherwise look up the existing product
             let targetCategory = category;
             if (!targetCategory) {
                 const existing = await Product.findById(req.params.id).select("category");
@@ -164,6 +175,19 @@ export const updateProduct = async (req, res) => {
                     { $set: { isCategoryCover: false } }
                 );
             }
+        }
+
+        // Recompute totalStock if sizes are provided
+        if (req.body.sizes) {
+            const sizes = req.body.sizes;
+            const sizeNames = sizes.map((s) => s.size);
+            if (new Set(sizeNames).size !== sizeNames.length) {
+                return res.status(400).json({ success: false, message: "Duplicate sizes are not allowed." });
+            }
+            if (sizes.some((s) => s.stock < 0)) {
+                return res.status(400).json({ success: false, message: "Stock cannot be negative." });
+            }
+            req.body.totalStock = sizes.reduce((sum, s) => sum + (Number(s.stock) || 0), 0);
         }
 
         const product = await Product.findByIdAndUpdate(
@@ -215,6 +239,35 @@ export const deleteProduct = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error deleting product",
+            error: error.message,
+        });
+    }
+};
+
+// Bulk delete products (Admin only)
+export const bulkDeleteProducts = async (req, res) => {
+    try {
+        const { productIds } = req.body;
+
+        if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Please provide an array of product IDs.",
+            });
+        }
+
+        const result = await Product.deleteMany({ _id: { $in: productIds } });
+
+        res.status(200).json({
+            success: true,
+            message: `${result.deletedCount} product(s) deleted successfully.`,
+            deletedCount: result.deletedCount,
+        });
+    } catch (error) {
+        console.error("Bulk Delete Error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error deleting products",
             error: error.message,
         });
     }
