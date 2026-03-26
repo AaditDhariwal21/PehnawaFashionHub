@@ -215,6 +215,9 @@ const CheckoutPage = () => {
             const data = await res.json();
 
             if (data.success && data.checkoutUrl) {
+                if (data.squareOrderId) {
+                    sessionStorage.setItem('pehnawa_squareOrderId', data.squareOrderId);
+                }
                 window.location.href = data.checkoutUrl;
             } else {
                 alert(data.message || 'Failed to create checkout session.');

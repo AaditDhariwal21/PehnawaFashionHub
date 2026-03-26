@@ -72,19 +72,52 @@ export const createOrder = async (req, res) => {
             subtotal += product.price * qty;
         }
 
-        /* ── Phase 2: Deduct stock per size and recompute totalStock ── */
+        /* ── Phase 2: Deduct stock atomically (race-condition safe) ── */
+        const deducted = [];
+
         for (const r of resolved) {
+            let result;
+
             if (r.product.sizes && r.product.sizes.length > 0 && r.size) {
-                await Product.updateOne(
-                    { _id: r.product._id, "sizes.size": r.size },
+                result = await Product.updateOne(
+                    {
+                        _id: r.product._id,
+                        sizes: { $elemMatch: { size: r.size, stock: { $gte: r.qty } } },
+                    },
                     { $inc: { "sizes.$.stock": -r.qty, totalStock: -r.qty } }
                 );
             } else if (r.product.totalStock != null) {
-                await Product.updateOne(
-                    { _id: r.product._id },
+                result = await Product.updateOne(
+                    { _id: r.product._id, totalStock: { $gte: r.qty } },
                     { $inc: { totalStock: -r.qty } }
                 );
+            } else {
+                continue;
             }
+
+            if (result.modifiedCount === 0) {
+                /* Rollback previously deducted items */
+                for (const d of deducted) {
+                    if (d.size) {
+                        await Product.updateOne(
+                            { _id: d.productId, "sizes.size": d.size },
+                            { $inc: { "sizes.$.stock": d.qty, totalStock: d.qty } }
+                        );
+                    } else {
+                        await Product.updateOne(
+                            { _id: d.productId },
+                            { $inc: { totalStock: d.qty } }
+                        );
+                    }
+                }
+                const sizeLabel = r.size ? ` (${r.size})` : "";
+                return res.status(400).json({
+                    success: false,
+                    message: `"${r.product.name}"${sizeLabel} just sold out. Please refresh and try again.`,
+                });
+            }
+
+            deducted.push({ productId: r.product._id, size: r.size, qty: r.qty });
         }
 
         /* ── Phase 3: Build order items array ── */

@@ -90,7 +90,26 @@ export const handleSquareWebhook = async (req, res) => {
             return res.status(200).send("OK");
         }
 
-        /* ── 8. Resolve products & validate stock ── */
+        /* ── 8. Verify payment amount matches expected total ── */
+        let squareOrderData;
+        try {
+            squareOrderData = await squareClient.orders.get({ orderId: squareOrderId });
+        } catch (sqErr) {
+            console.error(`[Webhook] Failed to fetch Square order ${squareOrderId}:`, sqErr.message);
+            return res.status(200).send("OK");
+        }
+
+        const paidAmountCents = Number(squareOrderData.order?.totalMoney?.amount ?? 0);
+        const expectedCents = Math.round(pending.totalAmount * 100);
+
+        if (Math.abs(paidAmountCents - expectedCents) > 1) {
+            console.error(
+                `[Webhook] Amount mismatch for ${squareOrderId}: Square=${paidAmountCents}¢, expected=${expectedCents}¢ — skipping order creation.`
+            );
+            return res.status(200).send("OK");
+        }
+
+        /* ── 9. Resolve products ── */
         const resolved = [];
         for (const ci of pending.cartItems) {
             const product = await Product.findById(ci.productId);
@@ -99,43 +118,67 @@ export const handleSquareWebhook = async (req, res) => {
                 return res.status(200).send("OK");
             }
 
-            const requestedSize = ci.size || "";
-
-            if (product.sizes && product.sizes.length > 0 && requestedSize) {
-                const sizeEntry = product.sizes.find((s) => s.size === requestedSize);
-                if (!sizeEntry || sizeEntry.stock < ci.quantity) {
-                    console.error(`[Webhook] Insufficient stock for "${product.name}" (${requestedSize}).`);
-                    return res.status(200).send("OK");
-                }
-            } else if (product.totalStock != null && product.totalStock < ci.quantity) {
-                console.error(`[Webhook] Insufficient stock for "${product.name}".`);
-                return res.status(200).send("OK");
-            }
-
             resolved.push({
                 product,
                 qty: ci.quantity,
                 image: ci.image,
-                size: requestedSize,
+                size: ci.size || "",
             });
         }
 
-        /* ── 9. Deduct stock per size ── */
+        /* ── 10. Deduct stock atomically (race-condition safe) ── */
+        const deducted = [];
+        let stockFailed = false;
+
         for (const r of resolved) {
+            let result;
+
             if (r.product.sizes && r.product.sizes.length > 0 && r.size) {
-                await Product.updateOne(
-                    { _id: r.product._id, "sizes.size": r.size },
+                result = await Product.updateOne(
+                    {
+                        _id: r.product._id,
+                        sizes: { $elemMatch: { size: r.size, stock: { $gte: r.qty } } },
+                    },
                     { $inc: { "sizes.$.stock": -r.qty, totalStock: -r.qty } }
                 );
             } else if (r.product.totalStock != null) {
-                await Product.updateOne(
-                    { _id: r.product._id },
+                result = await Product.updateOne(
+                    { _id: r.product._id, totalStock: { $gte: r.qty } },
                     { $inc: { totalStock: -r.qty } }
                 );
+            } else {
+                continue;
             }
+
+            if (result.modifiedCount === 0) {
+                console.error(`[Webhook] Stock race condition for "${r.product.name}" (${r.size || "no size"}).`);
+                /* Rollback already-deducted items */
+                for (const d of deducted) {
+                    if (d.size) {
+                        await Product.updateOne(
+                            { _id: d.productId, "sizes.size": d.size },
+                            { $inc: { "sizes.$.stock": d.qty, totalStock: d.qty } }
+                        );
+                    } else {
+                        await Product.updateOne(
+                            { _id: d.productId },
+                            { $inc: { totalStock: d.qty } }
+                        );
+                    }
+                }
+                stockFailed = true;
+                break;
+            }
+
+            deducted.push({ productId: r.product._id, size: r.size, qty: r.qty });
         }
 
-        /* ── 10. Create the order ── */
+        if (stockFailed) {
+            console.error(`[Webhook] Order skipped due to insufficient stock (squareOrderId: ${squareOrderId}).`);
+            return res.status(200).send("OK");
+        }
+
+        /* ── 11. Create the order ── */
         const orderItems = resolved.map((r) => ({
             productId: r.product._id,
             name: r.product.name,
@@ -163,7 +206,7 @@ export const handleSquareWebhook = async (req, res) => {
             paidAt: new Date(),
         });
 
-        /* ── 11. Clean up pending order ── */
+        /* ── 12. Clean up pending order ── */
         await PendingOrder.deleteOne({ _id: pending._id });
 
         console.log(`[Webhook] Order ${order.orderId} created for payment ${squarePaymentId}`);

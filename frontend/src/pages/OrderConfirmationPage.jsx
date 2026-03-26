@@ -72,6 +72,7 @@ const OrderConfirmationPage = () => {
                 if (data.success && data.order) {
                     clearCart();
                     clearBuyNowItem();
+                    sessionStorage.removeItem('pehnawa_squareOrderId');
                     setOrder(data.order);
                     setLoading(false);
                     return;
@@ -89,18 +90,23 @@ const OrderConfirmationPage = () => {
             /* ── Fallback: use the old verify endpoint ── */
             console.log('[OrderConfirmation] Polling exhausted — falling back to verify endpoint.');
             try {
+                const storedOrderId = sessionStorage.getItem('pehnawa_squareOrderId');
                 const res = await fetch(`${API}/orders/verify-square-payment`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                     },
+                    body: JSON.stringify({
+                        squareOrderId: storedOrderId || undefined,
+                    }),
                 });
                 const data = await res.json();
 
                 if (data.success && data.order) {
                     clearCart();
                     clearBuyNowItem();
+                    sessionStorage.removeItem('pehnawa_squareOrderId');
                     setOrder(data.order);
                 } else {
                     setError(data.message || 'Unable to confirm your payment. Please contact support.');

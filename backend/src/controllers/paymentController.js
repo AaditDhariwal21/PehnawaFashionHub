@@ -2,10 +2,10 @@ import squareClient, { getLocationId } from "../services/squareClient.js";
 import Product from "../models/Products.js";
 import PendingOrder from "../models/PendingOrder.js";
 import Order from "../models/Order.js";
+import { getShippingRate } from "../services/shippingService.js";
 import crypto from "crypto";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
-const DEFAULT_SHIPPING = 8;
 
 /* ══════════════════════════════════════════════════════════════
    POST /api/payments/create-checkout
@@ -15,7 +15,6 @@ export const createCheckoutSession = async (req, res) => {
         const {
             cartItems,
             shippingAddress,
-            shippingCost: clientShippingCost,
         } = req.body;
 
         if (!cartItems || cartItems.length === 0) {
@@ -25,14 +24,10 @@ export const createCheckoutSession = async (req, res) => {
             return res.status(400).json({ success: false, message: "Shipping address is required." });
         }
 
-        const SHIPPING =
-            typeof clientShippingCost === "number" && clientShippingCost > 0
-                ? clientShippingCost
-                : DEFAULT_SHIPPING;
-
         /* ── 1. Resolve products & recalculate subtotal server-side ── */
         const lineItems = [];
         let subtotal = 0;
+        let totalWeightLbs = 0;
         const pendingCartItems = [];
 
         for (const ci of cartItems) {
@@ -70,6 +65,7 @@ export const createCheckoutSession = async (req, res) => {
             }
 
             subtotal += product.price * qty;
+            totalWeightLbs += (product.weight || 0) * qty;
 
             lineItems.push({
                 name: product.name,
@@ -88,7 +84,21 @@ export const createCheckoutSession = async (req, res) => {
             });
         }
 
-        /* ── 2. Add shipping as a line item ── */
+        /* ── 2. Calculate shipping server-side (never trust client) ── */
+        const shippingResult = await getShippingRate(
+            {
+                name: shippingAddress.fullName,
+                phone: shippingAddress.phone,
+                address: shippingAddress.addressLine1,
+                city: shippingAddress.city,
+                state: shippingAddress.state,
+                zip: shippingAddress.zipCode,
+            },
+            totalWeightLbs
+        );
+        const SHIPPING = shippingResult.shippingCost;
+
+        /* ── 3. Add shipping as a line item ── */
         lineItems.push({
             name: "Shipping",
             quantity: "1",
@@ -101,7 +111,7 @@ export const createCheckoutSession = async (req, res) => {
         const totalAmount = subtotal + SHIPPING;
         const idempotencyKey = crypto.randomUUID();
 
-        /* ── 3. Create Square payment link ── */
+        /* ── 4. Create Square payment link ── */
         const locationId = await getLocationId();
         const response = await squareClient.checkout.paymentLinks.create({
             idempotencyKey,
@@ -124,7 +134,7 @@ export const createCheckoutSession = async (req, res) => {
             });
         }
 
-        /* ── 4. Store pending order for later confirmation ── */
+        /* ── 5. Store pending order for later confirmation ── */
         await PendingOrder.create({
             userId: req.user.id,
             paymentLinkId: paymentLink.id,
@@ -139,6 +149,7 @@ export const createCheckoutSession = async (req, res) => {
         return res.json({
             success: true,
             checkoutUrl: paymentLink.url,
+            squareOrderId: paymentLink.orderId,
         });
     } catch (error) {
         console.error("createCheckoutSession error:", error);
@@ -151,20 +162,87 @@ export const createCheckoutSession = async (req, res) => {
 };
 
 /* ══════════════════════════════════════════════════════════════
+   Helper: Atomic stock deduction with race-condition protection.
+   Returns true if ALL items were successfully deducted.
+   On failure, rolls back any items already deducted.
+   ══════════════════════════════════════════════════════════════ */
+const deductStockAtomically = async (resolved) => {
+    const deducted = []; // track successful deductions for rollback
+
+    for (const r of resolved) {
+        let result;
+
+        if (r.product.sizes && r.product.sizes.length > 0 && r.size) {
+            /* Atomic: only deduct if size entry has enough stock */
+            result = await Product.updateOne(
+                {
+                    _id: r.product._id,
+                    sizes: { $elemMatch: { size: r.size, stock: { $gte: r.qty } } },
+                },
+                { $inc: { "sizes.$.stock": -r.qty, totalStock: -r.qty } }
+            );
+        } else if (r.product.totalStock != null) {
+            /* Atomic: only deduct if totalStock is sufficient */
+            result = await Product.updateOne(
+                { _id: r.product._id, totalStock: { $gte: r.qty } },
+                { $inc: { totalStock: -r.qty } }
+            );
+        } else {
+            /* No stock tracking — skip */
+            continue;
+        }
+
+        if (result.modifiedCount === 0) {
+            /* Race condition: stock was taken by another request — rollback */
+            for (const d of deducted) {
+                if (d.size) {
+                    await Product.updateOne(
+                        { _id: d.productId, "sizes.size": d.size },
+                        { $inc: { "sizes.$.stock": d.qty, totalStock: d.qty } }
+                    );
+                } else {
+                    await Product.updateOne(
+                        { _id: d.productId },
+                        { $inc: { totalStock: d.qty } }
+                    );
+                }
+            }
+            return { success: false, failedProduct: r.product.name, failedSize: r.size };
+        }
+
+        deducted.push({ productId: r.product._id, size: r.size, qty: r.qty });
+    }
+
+    return { success: true };
+};
+
+/* ══════════════════════════════════════════════════════════════
    POST /api/orders/verify-square-payment
    POST /api/orders/confirm-square-payment
    POST /api/payments/confirm
 
    Square Payment Links do NOT append query params to the
-   redirect URL. Instead, the backend looks up the most recent
-   PendingOrder for the authenticated user and verifies
-   payment by checking for tenders on the Square order.
+   redirect URL. The frontend passes squareOrderId (stored in
+   sessionStorage before redirect) for precise lookup. Falls
+   back to most-recent-for-user if not provided.
    ══════════════════════════════════════════════════════════════ */
 export const confirmPayment = async (req, res) => {
     try {
-        /* ── 1. Find the most recent pending order for this user ── */
-        const pending = await PendingOrder.findOne({ userId: req.user.id })
-            .sort({ createdAt: -1 });
+        const { squareOrderId: clientSquareOrderId } = req.body || {};
+
+        /* ── 1. Find the pending order — prefer exact match ── */
+        let pending;
+        if (clientSquareOrderId) {
+            pending = await PendingOrder.findOne({
+                userId: req.user.id,
+                squareOrderId: clientSquareOrderId,
+            });
+        }
+        if (!pending) {
+            /* Fallback: most recent for this user */
+            pending = await PendingOrder.findOne({ userId: req.user.id })
+                .sort({ createdAt: -1 });
+        }
 
         if (!pending) {
             return res.status(404).json({
@@ -178,7 +256,6 @@ export const confirmPayment = async (req, res) => {
             "paymentResult.squareOrderId": pending.squareOrderId,
         });
         if (existingOrder) {
-            /* Already confirmed — just return the existing order */
             await PendingOrder.deleteOne({ _id: pending._id });
             return res.json({ success: true, order: existingOrder });
         }
@@ -197,11 +274,6 @@ export const confirmPayment = async (req, res) => {
             });
         }
 
-        /*
-         * Square SDK returns { order: { state, tenders, ... } }
-         * Checkout orders remain in "OPEN" state after payment.
-         * A successful payment attaches a "tender" to the order.
-         */
         const squareOrder = squareOrderResponse.order;
         const tenders = squareOrder?.tenders || [];
 
@@ -212,7 +284,21 @@ export const confirmPayment = async (req, res) => {
             });
         }
 
-        /* ── 4. Validate stock & resolve products ── */
+        /* ── 4. Verify paid amount matches expected total ── */
+        const paidAmountCents = Number(squareOrder.totalMoney?.amount ?? 0);
+        const expectedCents = Math.round(pending.totalAmount * 100);
+
+        if (Math.abs(paidAmountCents - expectedCents) > 1) {
+            console.error(
+                `[confirmPayment] Amount mismatch: Square charged ${paidAmountCents}¢, expected ${expectedCents}¢ (order ${pending.squareOrderId})`
+            );
+            return res.status(400).json({
+                success: false,
+                message: "Payment amount does not match order total. Please contact support.",
+            });
+        }
+
+        /* ── 5. Resolve products ── */
         const resolved = [];
 
         for (const ci of pending.cartItems) {
@@ -224,47 +310,25 @@ export const confirmPayment = async (req, res) => {
                 });
             }
 
-            const requestedSize = ci.size || "";
-
-            if (product.sizes && product.sizes.length > 0 && requestedSize) {
-                const sizeEntry = product.sizes.find((s) => s.size === requestedSize);
-                if (!sizeEntry || sizeEntry.stock < ci.quantity) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `Insufficient stock for "${product.name}" (${requestedSize}).`,
-                    });
-                }
-            } else if (product.totalStock != null && product.totalStock < ci.quantity) {
-                return res.status(400).json({
-                    success: false,
-                    message: `Insufficient stock for "${product.name}".`,
-                });
-            }
-
             resolved.push({
                 product,
                 qty: ci.quantity,
                 image: ci.image,
-                size: requestedSize,
+                size: ci.size || "",
             });
         }
 
-        /* ── 5. Deduct stock per size atomically ── */
-        for (const r of resolved) {
-            if (r.product.sizes && r.product.sizes.length > 0 && r.size) {
-                await Product.updateOne(
-                    { _id: r.product._id, "sizes.size": r.size },
-                    { $inc: { "sizes.$.stock": -r.qty, totalStock: -r.qty } }
-                );
-            } else if (r.product.totalStock != null) {
-                await Product.updateOne(
-                    { _id: r.product._id },
-                    { $inc: { totalStock: -r.qty } }
-                );
-            }
+        /* ── 6. Deduct stock atomically (race-condition safe) ── */
+        const stockResult = await deductStockAtomically(resolved);
+        if (!stockResult.success) {
+            const sizeLabel = stockResult.failedSize ? ` (${stockResult.failedSize})` : "";
+            return res.status(400).json({
+                success: false,
+                message: `Insufficient stock for "${stockResult.failedProduct}"${sizeLabel}. It may have just sold out.`,
+            });
         }
 
-        /* ── 6. Create the order ── */
+        /* ── 7. Create the order ── */
         const orderItems = resolved.map((r) => ({
             productId: r.product._id,
             name: r.product.name,
@@ -294,7 +358,7 @@ export const confirmPayment = async (req, res) => {
             paidAt: new Date(),
         });
 
-        /* ── 7. Clean up pending order ── */
+        /* ── 8. Clean up pending order ── */
         await PendingOrder.deleteOne({ _id: pending._id });
 
         return res.status(201).json({ success: true, order });
