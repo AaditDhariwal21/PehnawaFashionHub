@@ -98,13 +98,21 @@ export const getProductsBySpecialTag = async (req, res) => {
 // Create product (Admin only)
 export const createProduct = async (req, res) => {
     try {
-        const { name, description, price, category, images, sizes, specialTag, weight, isCategoryCover } = req.body;
+        const {
+            name, description, shortDescription, price, sellingPrice,
+            category, images, colors, sizes, specialTag, weight, isCategoryCover,
+        } = req.body;
 
         if (!name || !description || !price || !category || !weight) {
             return res.status(400).json({
                 success: false,
                 message: "Please provide name, description, price, category, and weight",
             });
+        }
+
+        // Validate sellingPrice
+        if (sellingPrice != null && sellingPrice !== "" && Number(sellingPrice) >= Number(price)) {
+            return res.status(400).json({ success: false, message: "Selling price must be less than MRP." });
         }
 
         // Validate sizes
@@ -130,10 +138,13 @@ export const createProduct = async (req, res) => {
 
         const product = new Product({
             name,
+            shortDescription: shortDescription || "",
             description,
             price,
+            sellingPrice: sellingPrice != null && sellingPrice !== "" ? Number(sellingPrice) : null,
             category,
             images: images || [],
+            colors: colors || [],
             sizes: parsedSizes,
             totalStock,
             weight,
@@ -292,6 +303,7 @@ export const searchProducts = async (req, res) => {
                 { name: regex },
                 { category: regex },
                 { description: regex },
+                { shortDescription: regex },
             ],
         });
 

@@ -4,6 +4,20 @@ const sizeEntrySchema = new mongoose.Schema(
     {
         size: { type: String, required: true },
         stock: { type: Number, required: true, min: 0 },
+        price: { type: Number, default: null }, // optional per-size price override
+    },
+    { _id: false }
+);
+
+const colorImageSchema = new mongoose.Schema(
+    {
+        colorName: { type: String, required: true },
+        images: [
+            {
+                url: { type: String, required: true },
+                publicId: { type: String, required: true },
+            },
+        ],
     },
     { _id: false }
 );
@@ -15,13 +29,21 @@ const productSchema = new mongoose.Schema(
             required: true,
             trim: true,
         },
+        shortDescription: {
+            type: String,
+            default: "",
+        },
         description: {
             type: String,
             required: true,
         },
         price: {
-            type: Number,
+            type: Number, // baseMRP
             required: true,
+        },
+        sellingPrice: {
+            type: Number, // discounted price (optional)
+            default: null,
         },
         category: {
             type: String,
@@ -30,26 +52,27 @@ const productSchema = new mongoose.Schema(
         images: [
             {
                 url: {
-                    type: String, // Cloudinary secure URL for display
+                    type: String,
                     required: true,
                 },
                 publicId: {
-                    type: String, // Cloudinary public ID for management/deletion
+                    type: String,
                     required: true,
                 },
             },
         ],
+        colors: [colorImageSchema],
         sizes: [sizeEntrySchema],
         totalStock: {
             type: Number,
             default: 0,
         },
         weight: {
-            type: Number, // lbs – standard US weight unit for shipping
+            type: Number,
             required: true,
         },
         specialTag: {
-            type: String, // e.g., "New Arrival", "Best Seller", "Sale"
+            type: String,
             default: null,
         },
         isCategoryCover: {

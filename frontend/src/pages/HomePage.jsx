@@ -9,17 +9,12 @@ const HomePage = () => {
         <div className="min-h-screen bg-white">
             <Navbar />
 
-            {/* Hero Banner */}
+            {/* Hero Banner — image already contains branded text */}
             <section className="w-full">
                 <img
                     src="/PehnawaHeroBanner.webp"
                     alt="Pehnawa — Where Tradition Meets Style"
-                    style={{
-                        width: '100%',
-                        height: 'auto',
-                        display: 'block',
-                        objectFit: 'cover',
-                    }}
+                    className="w-full h-auto block"
                 />
             </section>
 

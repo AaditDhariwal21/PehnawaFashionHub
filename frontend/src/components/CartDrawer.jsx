@@ -217,7 +217,7 @@ const CartDrawer = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             {cartItems.map((item) => (
                                 <div
-                                    key={`${item.productId}-${item.size}`}
+                                    key={`${item.productId}-${item.size}-${item.color || ''}`}
                                     style={{
                                         display: 'flex',
                                         gap: '1rem',
@@ -285,8 +285,13 @@ const CartDrawer = () => {
                                                 {item.name}
                                             </p>
                                             {item.size && (
-                                                <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                                                <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.15rem' }}>
                                                     Size: <span style={{ fontWeight: 600 }}>{item.size}</span>
+                                                </p>
+                                            )}
+                                            {item.color && (
+                                                <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                                                    Color: <span style={{ fontWeight: 600 }}>{item.color}</span>
                                                 </p>
                                             )}
                                             <p style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111827' }}>
@@ -307,7 +312,7 @@ const CartDrawer = () => {
                                                 }}
                                             >
                                                 <button
-                                                    onClick={() => updateQuantity(item.productId, item.size, item.quantity - 1)}
+                                                    onClick={() => updateQuantity(item.productId, item.size, item.color || '', item.quantity - 1)}
                                                     disabled={item.quantity <= 1}
                                                     style={{
                                                         width: '2rem',
@@ -343,7 +348,7 @@ const CartDrawer = () => {
                                                     {item.quantity}
                                                 </span>
                                                 <button
-                                                    onClick={() => updateQuantity(item.productId, item.size, item.quantity + 1)}
+                                                    onClick={() => updateQuantity(item.productId, item.size, item.color || '', item.quantity + 1)}
                                                     style={{
                                                         width: '2rem',
                                                         height: '2rem',
@@ -369,7 +374,7 @@ const CartDrawer = () => {
 
                                             {/* Remove */}
                                             <button
-                                                onClick={() => removeFromCart(item.productId, item.size)}
+                                                onClick={() => removeFromCart(item.productId, item.size, item.color || '')}
                                                 style={{
                                                     display: 'flex',
                                                     alignItems: 'center',

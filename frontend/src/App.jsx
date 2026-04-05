@@ -22,8 +22,10 @@ import AdminOrderDetailPage from './pages/AdminOrderDetailPage';
 import OrderConfirmationPage from './pages/OrderConfirmationPage';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { WishlistProvider } from './context/WishlistContext';
 import CartDrawer from './components/CartDrawer';
 import AdminToggleButton from './components/AdminToggleButton';
+import WishlistPage from './pages/WishlistPage';
 
 function App() {
   return (
@@ -31,6 +33,7 @@ function App() {
       <ScrollToTop />
       <AuthProvider>
         <CartProvider>
+          <WishlistProvider>
           <CartDrawer />
           <AdminToggleButton />
           <Routes>
@@ -48,6 +51,7 @@ function App() {
             <Route path="/account/orders/:id" element={<OrderDetailPage />} />
             <Route path="/order-confirmation/:id" element={<OrderConfirmationPage />} />
             <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
+            <Route path="/wishlist" element={<WishlistPage />} />
             <Route path="/search" element={<SearchResultsPage />} />
             <Route path="/about-us" element={<AboutUsPage />} />
             <Route path="/contact-us" element={<ContactUsPage />} />
@@ -56,6 +60,7 @@ function App() {
             <Route path="/shipping-policy" element={<ShippingPolicyPage />} />
             <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           </Routes>
+          </WishlistProvider>
         </CartProvider>
       </AuthProvider>
     </Router>

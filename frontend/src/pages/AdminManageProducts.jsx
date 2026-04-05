@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { X, Plus, Trash2, Upload } from 'lucide-react';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import { useAuth } from '../context/AuthContext';
 import formatPrice from '../utils/formatPrice';
 
@@ -9,362 +12,286 @@ const PRESET_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
 const categories = ['Anarkalis', 'Coord Sets', 'Lehangas', 'Indo Western', 'Suits & Kurtis', 'Sarees', 'Blouses', 'Kidswear', "Men's Kurta", 'Dupattas', 'Pashminas'];
 const specialTags = ['', 'New Arrival', 'Best Seller', 'Sale', 'Trending'];
 
+const quillModules = {
+    toolbar: [
+        ['bold', 'italic', 'underline'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['link'],
+        ['clean'],
+    ],
+};
+const quillFormats = ['bold', 'italic', 'underline', 'list', 'link'];
+
 /* ═══════════════════════════════ Edit Modal ═══════════════════════════════ */
 const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
-    const [formData, setFormData] = useState({
-        name: '',
-        description: '',
-        price: '',
-        category: '',
-        specialTag: '',
-        weight: '',
-        isCategoryCover: false,
-    });
+    const [formData, setFormData] = useState({ name: '', shortDescription: '', description: '', price: '', sellingPrice: '', category: '', specialTag: '', weight: '', isCategoryCover: false });
     const [sizes, setSizes] = useState([]);
     const [customSize, setCustomSize] = useState('');
     const [existingImages, setExistingImages] = useState([]);
     const [newFiles, setNewFiles] = useState([]);
     const [newPreviews, setNewPreviews] = useState([]);
+    const [existingColors, setExistingColors] = useState([]); // [{colorName, images:[{url,publicId}]}]
+    const [newColorFiles, setNewColorFiles] = useState({}); // {colorName: File[]}
+    const [newColorPreviews, setNewColorPreviews] = useState({}); // {colorName: string[]}
+    const [newColorName, setNewColorName] = useState('');
+    const [activeColorTab, setActiveColorTab] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
     const totalStock = sizes.reduce((sum, s) => sum + (Number(s.stock) || 0), 0);
 
     useEffect(() => {
-        if (product) {
-            const initForm = async () => {
-                let isActiveCover = product.isCategoryCover || false;
-                if (!isActiveCover && product.category) {
-                    try {
-                        const res = await fetch(`${API_BASE_URL}/products/categories/covers`);
-                        const data = await res.json();
-                        if (data.success && data.covers[product.category]) {
-                            if (data.covers[product.category].productId === product._id) {
-                                isActiveCover = true;
-                            }
-                        }
-                    } catch { /* silent */ }
-                }
-
-                setFormData({
-                    name: product.name || '',
-                    description: product.description || '',
-                    price: product.price ?? '',
-                    category: product.category || '',
-                    specialTag: product.specialTag || '',
-                    weight: product.weight ?? '',
-                    isCategoryCover: isActiveCover,
-                });
-            };
-
-            initForm();
-            setSizes(product.sizes && product.sizes.length > 0
-                ? product.sizes.map(s => ({ size: s.size, stock: s.stock }))
-                : []);
-            setExistingImages(product.images || []);
-            setNewFiles([]);
-            setNewPreviews([]);
-            setError('');
-        }
+        if (!product) return;
+        const initForm = async () => {
+            let isActiveCover = product.isCategoryCover || false;
+            if (!isActiveCover && product.category) {
+                try {
+                    const res = await fetch(`${API_BASE_URL}/products/categories/covers`);
+                    const data = await res.json();
+                    if (data.success && data.covers[product.category]?.productId === product._id) isActiveCover = true;
+                } catch { /* silent */ }
+            }
+            setFormData({
+                name: product.name || '', shortDescription: product.shortDescription || '', description: product.description || '',
+                price: product.price ?? '', sellingPrice: product.sellingPrice ?? '',
+                category: product.category || '', specialTag: product.specialTag || '', weight: product.weight ?? '',
+                isCategoryCover: isActiveCover,
+            });
+        };
+        initForm();
+        setSizes(product.sizes?.length ? product.sizes.map(s => ({ size: s.size, stock: s.stock, price: s.price ?? '' })) : []);
+        setExistingImages(product.images || []);
+        setExistingColors(product.colors || []);
+        setNewFiles([]); setNewPreviews([]); setNewColorFiles({}); setNewColorPreviews({});
+        setActiveColorTab(null); setError('');
     }, [product]);
 
     if (!product) return null;
-
     const token = localStorage.getItem('token');
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+    const handleInputChange = (e) => { const { name, value } = e.target; setFormData(p => ({ ...p, [name]: value })); };
+
+    /* Size helpers */
+    const addSize = (n) => { if (!n.trim() || sizes.some(s => s.size === n.trim())) return; setSizes(p => [...p, { size: n.trim(), stock: 0, price: '' }]); };
+    const removeSize = (i) => setSizes(p => p.filter((_, j) => j !== i));
+    const updateSize = (i, f, v) => setSizes(p => p.map((s, j) => j === i ? { ...s, [f]: v } : s));
+
+    /* General image helpers */
+    const removeExistingImage = (i) => setExistingImages(p => p.filter((_, j) => j !== i));
+    const handleNewImages = (e) => { const f = Array.from(e.target.files); setNewFiles(p => [...p, ...f]); setNewPreviews(p => [...p, ...f.map(x => URL.createObjectURL(x))]); };
+    const removeNewImage = (i) => { setNewFiles(p => p.filter((_, j) => j !== i)); setNewPreviews(p => p.filter((_, j) => j !== i)); };
+
+    /* Color helpers */
+    const addColor = () => { const n = newColorName.trim(); if (!n || existingColors.some(c => c.colorName === n)) return; setExistingColors(p => [...p, { colorName: n, images: [] }]); setActiveColorTab(n); setNewColorName(''); };
+    const removeColor = (name) => { setExistingColors(p => p.filter(c => c.colorName !== name)); if (activeColorTab === name) setActiveColorTab(null); const nf = { ...newColorFiles }; delete nf[name]; setNewColorFiles(nf); const np = { ...newColorPreviews }; delete np[name]; setNewColorPreviews(np); };
+    const removeExistingColorImage = (colorName, imgIdx) => { setExistingColors(p => p.map(c => c.colorName === colorName ? { ...c, images: c.images.filter((_, j) => j !== imgIdx) } : c)); };
+    const handleColorImageUpload = (colorName, e) => { const f = Array.from(e.target.files); setNewColorFiles(p => ({ ...p, [colorName]: [...(p[colorName] || []), ...f] })); setNewColorPreviews(p => ({ ...p, [colorName]: [...(p[colorName] || []), ...f.map(x => URL.createObjectURL(x))] })); };
+    const removeNewColorImage = (colorName, i) => { setNewColorFiles(p => ({ ...p, [colorName]: (p[colorName] || []).filter((_, j) => j !== i) })); setNewColorPreviews(p => ({ ...p, [colorName]: (p[colorName] || []).filter((_, j) => j !== i) })); };
+
+    /* Upload helper */
+    const uploadFiles = async (files) => {
+        if (!files.length) return [];
+        const fd = new FormData(); files.forEach(f => fd.append('images', f));
+        const res = await fetch(`${API_BASE_URL}/adminDashboard/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Upload failed');
+        return data.images.map(img => ({ url: img.url, publicId: img.public_id }));
     };
 
-    /* ── Size helpers ── */
-    const addSize = (sizeName) => {
-        if (!sizeName.trim()) return;
-        if (sizes.some(s => s.size === sizeName.trim())) return;
-        setSizes(prev => [...prev, { size: sizeName.trim(), stock: 0 }]);
-    };
-    const removeSize = (index) => setSizes(prev => prev.filter((_, i) => i !== index));
-    const updateSizeStock = (index, stock) => {
-        const val = Math.max(0, Number(stock) || 0);
-        setSizes(prev => prev.map((s, i) => i === index ? { ...s, stock: val } : s));
-    };
-
-    /* ── Image helpers ── */
-    const removeExistingImage = (index) => setExistingImages(prev => prev.filter((_, i) => i !== index));
-    const handleNewImages = (e) => {
-        const files = Array.from(e.target.files);
-        setNewFiles(prev => [...prev, ...files]);
-        setNewPreviews(prev => [...prev, ...files.map(f => URL.createObjectURL(f))]);
-    };
-    const removeNewImage = (index) => {
-        setNewFiles(prev => prev.filter((_, i) => i !== index));
-        setNewPreviews(prev => {
-            URL.revokeObjectURL(prev[index]);
-            return prev.filter((_, i) => i !== index);
-        });
-    };
-
-    /* ── Save ── */
+    /* Save */
     const handleSave = async () => {
-        setError('');
-        setIsLoading(true);
+        setError(''); setIsLoading(true);
         try {
-            let uploadedImages = [];
-            if (newFiles.length > 0) {
-                const fd = new FormData();
-                newFiles.forEach(f => fd.append('images', f));
-                const uploadRes = await fetch(`${API_BASE_URL}/adminDashboard/upload`, {
-                    method: 'POST',
-                    headers: { Authorization: `Bearer ${token}` },
-                    body: fd,
-                });
-                const uploadData = await uploadRes.json();
-                if (!uploadRes.ok) {
-                    setError(uploadData.message || 'Image upload failed');
-                    setIsLoading(false);
-                    return;
-                }
-                uploadedImages = uploadData.images.map(img => ({ url: img.url, publicId: img.public_id }));
+            if (formData.sellingPrice && Number(formData.sellingPrice) >= Number(formData.price)) { setError('Selling price must be less than MRP.'); setIsLoading(false); return; }
+            const uploadedGeneral = await uploadFiles(newFiles);
+            // Per-color uploads
+            const finalColors = [];
+            for (const c of existingColors) {
+                const newImgs = await uploadFiles(newColorFiles[c.colorName] || []);
+                finalColors.push({ colorName: c.colorName, images: [...c.images, ...newImgs] });
             }
-
+            const cleanSizes = sizes.map(s => ({ size: s.size, stock: Math.max(0, Number(s.stock) || 0), ...(s.price !== '' && s.price != null ? { price: Number(s.price) } : {}) }));
             const body = {
-                name: formData.name,
-                description: formData.description,
-                price: Number(formData.price),
-                category: formData.category,
-                sizes,
-                totalStock,
-                weight: Number(formData.weight) || 0,
-                specialTag: formData.specialTag || null,
-                isCategoryCover: formData.isCategoryCover,
-                images: [...existingImages, ...uploadedImages],
+                name: formData.name, shortDescription: formData.shortDescription, description: formData.description,
+                price: Number(formData.price), sellingPrice: formData.sellingPrice ? Number(formData.sellingPrice) : null,
+                category: formData.category, sizes: cleanSizes, totalStock,
+                weight: Number(formData.weight) || 0, specialTag: formData.specialTag || null, isCategoryCover: formData.isCategoryCover,
+                images: [...existingImages, ...uploadedGeneral], colors: finalColors,
             };
-
-            const res = await fetch(`${API_BASE_URL}/products/${product._id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify(body),
-            });
+            const res = await fetch(`${API_BASE_URL}/products/${product._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
             const data = await res.json();
-            if (!res.ok) {
-                setError(data.message || 'Failed to update product');
-                setIsLoading(false);
-                return;
-            }
+            if (!res.ok) { setError(data.message || 'Failed to update.'); setIsLoading(false); return; }
             onSaved(data.product);
-        } catch (err) {
-            console.error(err);
-            setError('Network error. Please try again.');
-        } finally {
-            setIsLoading(false);
-        }
+        } catch (err) { console.error(err); setError(err.message || 'Network error.'); } finally { setIsLoading(false); }
     };
 
-    /* ── Delete ── */
+    /* Delete */
     const handleDelete = async () => {
         if (!window.confirm(`Delete "${product.name}"? This cannot be undone.`)) return;
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/products/${product._id}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.message || 'Failed to delete product');
-                setIsLoading(false);
-                return;
-            }
+            const res = await fetch(`${API_BASE_URL}/products/${product._id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+            if (!res.ok) { const d = await res.json(); setError(d.message || 'Failed to delete.'); setIsLoading(false); return; }
             onDeleted(product._id);
-        } catch (err) {
-            console.error(err);
-            setError('Network error. Please try again.');
-        } finally {
-            setIsLoading(false);
-        }
+        } catch (err) { console.error(err); setError('Network error.'); } finally { setIsLoading(false); }
     };
 
-    const handleBackdropClick = (e) => { if (e.target === e.currentTarget) onClose(); };
-
-    const inputStyles = 'w-full text-sm border border-gray-200 rounded-lg text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all';
-    const inputPadding = { padding: '12px 14px' };
-    const labelStyles = 'block text-xs font-medium text-gray-500 mb-2';
-    const sectionTitle = 'text-sm font-semibold text-gray-700';
+    const inputCls = 'w-full text-sm border border-gray-200 rounded-lg text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all';
+    const inputPad = { padding: '10px 14px' };
+    const labelCls = 'block text-xs font-medium text-gray-500 mb-1.5';
+    const activeColorEntry = existingColors.find(c => c.colorName === activeColorTab);
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
-            onClick={handleBackdropClick}
-        >
-            <div
-                className="relative w-full max-h-[90vh] overflow-hidden flex flex-col"
-                style={{ maxWidth: 'min(920px,95vw)', backgroundColor: '#FFF', borderRadius: '16px', boxShadow: '0 24px 48px -12px rgba(0,0,0,0.18)' }}
-            >
-                {/* ── Header ── */}
-                <div className="flex items-center justify-between shrink-0" style={{ padding: '20px 32px', borderBottom: '1px solid #E5E7EB' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)' }} onClick={(e) => e.target === e.currentTarget && onClose()}>
+            <div className="relative w-full max-h-[92vh] overflow-hidden flex flex-col" style={{ maxWidth: '1100px', backgroundColor: '#fff', borderRadius: '16px', boxShadow: '0 24px 48px -12px rgba(0,0,0,0.18)' }}>
+                {/* Header */}
+                <div className="flex items-center justify-between shrink-0" style={{ padding: '18px 28px', borderBottom: '1px solid #e5e7eb' }}>
                     <h2 className="text-lg font-semibold text-gray-900">Edit Product</h2>
-                    <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all cursor-pointer">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
+                    <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all cursor-pointer"><X className="w-5 h-5" /></button>
                 </div>
 
-                {/* ── Body ── */}
-                <div className="flex-1 overflow-y-auto" style={{ padding: '28px 32px' }}>
-                    {error && <div style={{ marginBottom: '24px', padding: '12px 16px' }} className="bg-red-50 border border-red-200 rounded-lg"><p className="text-red-600 text-sm">{error}</p></div>}
+                {/* Body — 2-column */}
+                <div className="flex-1 overflow-y-auto" style={{ padding: '24px 28px' }}>
+                    {error && <div className="bg-red-50 border border-red-200 rounded-lg mb-5" style={{ padding: '10px 16px' }}><p className="text-red-600 text-sm">{error}</p></div>}
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        {/* Product Name */}
-                        <div>
-                            <label className={labelStyles}>Product Name <span className="text-red-400">*</span></label>
-                            <input type="text" name="name" value={formData.name} onChange={handleInputChange} placeholder="Enter product name" className={inputStyles} style={inputPadding} />
-                        </div>
-
-                        {/* Description */}
-                        <div>
-                            <label className={labelStyles}>Description <span className="text-red-400">*</span></label>
-                            <textarea name="description" value={formData.description} onChange={handleInputChange} placeholder="Enter product description" rows={3} className={`${inputStyles} resize-none`} style={inputPadding} />
-                        </div>
-
-                        {/* Price & Weight */}
-                        <div className="grid grid-cols-2" style={{ gap: '20px' }}>
-                            <div>
-                                <label className={labelStyles}>Price ($) <span className="text-red-400">*</span></label>
-                                <input type="number" name="price" value={formData.price} onChange={handleInputChange} placeholder="0" min="0" className={inputStyles} style={inputPadding} />
-                            </div>
-                            <div>
-                                <label className={labelStyles}>Weight (lbs) <span className="text-red-400">*</span></label>
-                                <input type="number" name="weight" value={formData.weight} onChange={handleInputChange} placeholder="0.66" min="0.01" step="0.01" className={inputStyles} style={inputPadding} />
-                            </div>
-                        </div>
-
-                        {/* Category & Tag */}
-                        <div className="grid grid-cols-2" style={{ gap: '20px' }}>
-                            <div>
-                                <label className={labelStyles}>Category <span className="text-red-400">*</span></label>
-                                <select name="category" value={formData.category} onChange={handleInputChange} className={`${inputStyles} cursor-pointer`} style={inputPadding}>
-                                    <option value="">Select category</option>
-                                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className={labelStyles}>Special Tag</label>
-                                <select name="specialTag" value={formData.specialTag} onChange={handleInputChange} className={`${inputStyles} cursor-pointer`} style={inputPadding}>
-                                    <option value="">None</option>
-                                    {specialTags.filter(t => t).map(tag => <option key={tag} value={tag}>{tag}</option>)}
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* ── Size Inventory ── */}
-                        <div style={{ padding: '20px 24px', backgroundColor: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '12px' }}>
-                            <div className="flex items-center justify-between" style={{ marginBottom: '16px' }}>
-                                <p className={sectionTitle}>Size Inventory</p>
-                                <span className="text-xs font-bold rounded-full" style={{ padding: '4px 12px', backgroundColor: totalStock > 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.08)', color: totalStock > 0 ? '#16a34a' : '#dc2626' }}>
-                                    Total: {totalStock}
-                                </span>
-                            </div>
-
-                            {/* Preset sizes */}
-                            <div className="flex flex-wrap" style={{ gap: '10px', marginBottom: '16px' }}>
-                                {PRESET_SIZES.map(s => {
-                                    const added = sizes.some(sz => sz.size === s);
-                                    return (
-                                        <button key={s} type="button" onClick={() => addSize(s)} disabled={added}
-                                            className="text-xs font-semibold rounded-full border-[1.5px] transition-all"
-                                            style={{ padding: '6px 16px', borderColor: added ? '#d1d5db' : '#EFBF04', color: added ? '#9ca3af' : '#EFBF04', backgroundColor: added ? '#f3f4f6' : 'transparent', cursor: added ? 'default' : 'pointer' }}>
-                                            {added ? `${s} \u2713` : `+ ${s}`}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Custom size */}
-                            <div className="flex" style={{ gap: '10px', marginBottom: '16px' }}>
-                                <input type="text" value={customSize} onChange={(e) => setCustomSize(e.target.value)} placeholder="Custom size (e.g. Free Size)" className={`flex-1 ${inputStyles}`} style={{ padding: '10px 14px', fontSize: '0.8rem' }}
-                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSize(customSize); setCustomSize(''); } }} />
-                                <button type="button" onClick={() => { addSize(customSize); setCustomSize(''); }} className="text-xs font-semibold rounded-lg text-white cursor-pointer hover:opacity-90 transition-opacity" style={{ padding: '10px 20px', backgroundColor: '#EFBF04' }}>Add</button>
-                            </div>
-
-                            {/* Size rows */}
-                            {sizes.length > 0 ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {sizes.map((s, idx) => (
-                                        <div key={s.size} className="flex items-center bg-white rounded-lg" style={{ padding: '10px 14px', border: '1px solid #E5E7EB', gap: '12px' }}>
-                                            <span className="text-sm font-semibold text-gray-700" style={{ minWidth: '48px' }}>{s.size}</span>
-                                            <input type="number" value={s.stock} onChange={(e) => updateSizeStock(idx, e.target.value)} min="0" className="text-sm border border-gray-200 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-amber-400" style={{ padding: '6px 10px', width: '72px' }} />
-                                            <span className="text-xs text-gray-400">units</span>
-                                            <div className="flex-1" />
-                                            <button type="button" onClick={() => removeSize(idx)} className="text-gray-300 hover:text-red-500 transition-colors cursor-pointer">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                            </button>
-                                        </div>
-                                    ))}
+                    <div className="flex flex-col lg:flex-row gap-8">
+                        {/* LEFT — Images */}
+                        <div className="w-full lg:w-[42%] flex-shrink-0">
+                            {/* General images */}
+                            <div className="mb-6">
+                                <p className="text-sm font-semibold text-gray-700 mb-3">Product Images</p>
+                                {existingImages.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mb-3">
+                                        {existingImages.map((img, i) => (
+                                            <div key={i} className="relative">
+                                                <img src={img.url} alt="" className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
+                                                <button type="button" onClick={() => removeExistingImage(i)} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[0.55rem] cursor-pointer">x</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                <div className="border-2 border-dashed border-gray-200 rounded-xl text-center hover:border-amber-400 transition-colors cursor-pointer bg-gray-50/50 hover:bg-amber-50/30" style={{ padding: '20px 16px' }} onClick={() => document.getElementById('edit-gen-upload').click()}>
+                                    <input id="edit-gen-upload" type="file" accept="image/*" multiple onChange={handleNewImages} className="hidden" />
+                                    <Upload className="w-5 h-5 mx-auto text-gray-300 mb-1" />
+                                    <p className="text-xs text-gray-500">Upload images</p>
                                 </div>
-                            ) : (
-                                <p className="text-xs text-gray-400 text-center" style={{ padding: '8px 0' }}>No sizes added yet.</p>
-                            )}
+                                {newPreviews.length > 0 && <div className="flex flex-wrap gap-2 mt-3">{newPreviews.map((p, i) => (<div key={i} className="relative"><img src={p} alt="" className="w-14 h-14 object-cover rounded-lg border border-gray-200" /><button type="button" onClick={() => removeNewImage(i)} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[0.55rem] cursor-pointer">x</button></div>))}</div>}
+                            </div>
+
+                            {/* Color Variants */}
+                            <div>
+                                <p className="text-sm font-semibold text-gray-700 mb-3">Color Variants</p>
+                                <div className="flex gap-2 mb-3">
+                                    <input type="text" value={newColorName} onChange={(e) => setNewColorName(e.target.value)} placeholder="e.g. Red" className={`flex-1 ${inputCls}`} style={{ padding: '8px 12px', fontSize: '0.8rem' }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addColor(); } }} />
+                                    <button type="button" onClick={addColor} className="text-xs font-semibold rounded-lg text-white cursor-pointer hover:opacity-90" style={{ padding: '8px 14px', backgroundColor: '#EFBF04' }}><Plus className="w-3.5 h-3.5 inline -mt-0.5" /> Add</button>
+                                </div>
+                                {existingColors.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mb-3">
+                                        {existingColors.map(c => (
+                                            <div key={c.colorName} className="flex items-center gap-1.5 rounded-full cursor-pointer transition-all text-xs font-semibold" style={{ padding: '5px 12px', border: activeColorTab === c.colorName ? '2px solid #EFBF04' : '1.5px solid #e5e7eb', backgroundColor: activeColorTab === c.colorName ? '#fffbeb' : '#fff' }} onClick={() => setActiveColorTab(c.colorName)}>
+                                                <span className="text-gray-700">{c.colorName}</span>
+                                                <span className="text-gray-400 text-[0.65rem]">({c.images.length + (newColorFiles[c.colorName]?.length || 0)})</span>
+                                                <button type="button" onClick={(e) => { e.stopPropagation(); removeColor(c.colorName); }} className="text-gray-300 hover:text-red-500 ml-0.5 cursor-pointer"><X className="w-3 h-3" /></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {activeColorEntry && (
+                                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                        <p className="text-xs font-semibold text-gray-600 mb-2">Images for "{activeColorTab}"</p>
+                                        {activeColorEntry.images.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 mb-2">
+                                                {activeColorEntry.images.map((img, j) => (
+                                                    <div key={j} className="relative"><img src={img.url} alt="" className="w-12 h-12 object-cover rounded-lg border border-gray-200" /><button type="button" onClick={() => removeExistingColorImage(activeColorTab, j)} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[0.55rem] cursor-pointer">x</button></div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <div className="border-2 border-dashed border-gray-200 rounded-lg text-center cursor-pointer hover:border-amber-400" style={{ padding: '14px 10px' }} onClick={() => document.getElementById(`edit-color-upload-${activeColorTab}`).click()}>
+                                            <input id={`edit-color-upload-${activeColorTab}`} type="file" accept="image/*" multiple onChange={(e) => handleColorImageUpload(activeColorTab, e)} className="hidden" />
+                                            <Upload className="w-4 h-4 mx-auto text-gray-300 mb-1" /><p className="text-xs text-gray-400">Upload</p>
+                                        </div>
+                                        {(newColorPreviews[activeColorTab] || []).length > 0 && (
+                                            <div className="flex flex-wrap gap-2 mt-2">{newColorPreviews[activeColorTab].map((p, j) => (<div key={j} className="relative"><img src={p} alt="" className="w-12 h-12 object-cover rounded-lg border border-gray-200" /><button type="button" onClick={() => removeNewColorImage(activeColorTab, j)} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[0.55rem] cursor-pointer">x</button></div>))}</div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
-                        {/* Category Cover */}
-                        {formData.category && (
-                            <div style={{ padding: '16px 20px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px' }}>
-                                <p className={sectionTitle} style={{ marginBottom: '12px' }}>Category Cover</p>
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                    <input type="checkbox" checked={formData.isCategoryCover} onChange={(e) => setFormData(prev => ({ ...prev, isCategoryCover: e.target.checked }))} className="w-4 h-4 rounded border-gray-300 cursor-pointer accent-amber-500" />
-                                    <span className="text-sm text-gray-600">Use this product image as the category cover</span>
-                                </label>
+                        {/* RIGHT — Data */}
+                        <div className="flex-1 flex flex-col gap-5">
+                            <div><label className={labelCls}>Product Name *</label><input type="text" name="name" value={formData.name} onChange={handleInputChange} className={inputCls} style={inputPad} /></div>
+                            <div><label className={labelCls}>Short Description</label><input type="text" name="shortDescription" value={formData.shortDescription} onChange={handleInputChange} placeholder="Brief one-liner" className={inputCls} style={inputPad} /></div>
+                            <div>
+                                <label className={labelCls}>Full Description *</label>
+                                <div style={{ borderRadius: '0.5rem', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+                                    <ReactQuill
+                                        theme="snow"
+                                        value={formData.description}
+                                        onChange={(val) => setFormData((p) => ({ ...p, description: val }))}
+                                        placeholder="Detailed product description..."
+                                        modules={quillModules}
+                                        formats={quillFormats}
+                                        style={{ minHeight: '140px' }}
+                                    />
+                                </div>
                             </div>
-                        )}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className={labelCls}>MRP ($) *</label><input type="number" name="price" value={formData.price} onChange={handleInputChange} min="0" className={inputCls} style={inputPad} /></div>
+                                <div><label className={labelCls}>Selling Price ($)</label><input type="number" name="sellingPrice" value={formData.sellingPrice} onChange={handleInputChange} placeholder="Optional" min="0" className={inputCls} style={inputPad} /></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className={labelCls}>Weight (lbs) *</label><input type="number" name="weight" value={formData.weight} onChange={handleInputChange} min="0.01" step="0.01" className={inputCls} style={inputPad} /></div>
+                                <div><label className={labelCls}>Category *</label><select name="category" value={formData.category} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}><option value="">Select</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className={labelCls}>Special Tag</label><select name="specialTag" value={formData.specialTag} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}><option value="">None</option>{specialTags.filter(Boolean).map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                                {formData.category && <div className="flex items-end pb-1"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formData.isCategoryCover} onChange={(e) => setFormData(p => ({ ...p, isCategoryCover: e.target.checked }))} className="w-4 h-4 rounded cursor-pointer accent-amber-500" /><span className="text-xs text-gray-600">Category cover</span></label></div>}
+                            </div>
 
-                        {/* Images */}
-                        <div>
-                            <label className={labelStyles}>Product Images</label>
-                            {existingImages.length > 0 && (
-                                <div className="flex flex-wrap gap-3" style={{ marginBottom: '16px' }}>
-                                    {existingImages.map((img, idx) => (
-                                        <div key={idx} className="relative">
-                                            <img src={img.url} alt={`Existing ${idx + 1}`} className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
-                                            <button type="button" onClick={() => removeExistingImage(idx)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 cursor-pointer">x</button>
-                                        </div>
-                                    ))}
+                            {/* Size & Pricing */}
+                            <div className="bg-gray-50 border border-gray-200 rounded-xl" style={{ padding: '1.25rem 1.5rem' }}>
+                                <div className="flex items-center justify-between" style={{ marginBottom: '1.25rem' }}>
+                                    <p className="text-sm font-semibold text-gray-700">Size & Pricing</p>
+                                    <span className="text-xs font-bold rounded-full" style={{ padding: '4px 12px', backgroundColor: totalStock > 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.08)', color: totalStock > 0 ? '#16a34a' : '#dc2626' }}>Total: {totalStock}</span>
                                 </div>
-                            )}
-                            <div className="border-2 border-dashed border-gray-200 rounded-xl text-center hover:border-amber-400 transition-colors cursor-pointer bg-gray-50/50 hover:bg-amber-50/50" style={{ padding: '28px 20px' }}
-                                onClick={() => document.getElementById('edit-image-upload').click()}>
-                                <input id="edit-image-upload" type="file" accept="image/*" multiple onChange={handleNewImages} className="hidden" />
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                <p className="text-sm text-gray-500 font-medium">Click to upload new images</p>
-                                <p className="text-xs text-gray-400 mt-1">PNG, JPG, JPEG up to 10MB each</p>
+                                <div className="flex flex-wrap" style={{ gap: '0.6rem', marginBottom: '1rem' }}>
+                                    {PRESET_SIZES.map(s => { const added = sizes.some(sz => sz.size === s); return (<button key={s} type="button" onClick={() => addSize(s)} disabled={added} className="text-xs font-semibold rounded-full border-[1.5px] transition-all" style={{ padding: '7px 18px', borderColor: added ? '#d1d5db' : '#EFBF04', color: added ? '#9ca3af' : '#EFBF04', backgroundColor: added ? '#f3f4f6' : 'transparent', cursor: added ? 'default' : 'pointer' }}>{added ? `${s} ✓` : `+ ${s}`}</button>); })}
+                                </div>
+                                <div className="flex" style={{ gap: '0.5rem', marginBottom: '1.25rem' }}>
+                                    <input type="text" value={customSize} onChange={(e) => setCustomSize(e.target.value)} placeholder="Custom size (e.g. Free Size)" className={`flex-1 ${inputCls}`} style={{ padding: '9px 14px', fontSize: '0.8rem' }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSize(customSize); setCustomSize(''); } }} />
+                                    <button type="button" onClick={() => { addSize(customSize); setCustomSize(''); }} className="text-xs font-semibold rounded-lg text-white cursor-pointer hover:opacity-90" style={{ padding: '9px 20px', backgroundColor: '#EFBF04' }}>Add</button>
+                                </div>
+                                {sizes.length > 0 ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                                        {sizes.map((s, i) => (
+                                            <div key={s.size} className="flex items-center bg-white rounded-xl shadow-sm" style={{ padding: '0.75rem 1rem', border: '1px solid #e5e7eb', gap: '1rem' }}>
+                                                <span className="text-sm font-bold text-gray-800 bg-gray-100 rounded-lg text-center flex-shrink-0" style={{ padding: '0.3rem 0', width: '3rem' }}>{s.size}</span>
+                                                <div className="flex flex-col flex-1 min-w-0">
+                                                    <span className="text-[0.6rem] text-gray-400 font-semibold uppercase mb-0.5">Stock</span>
+                                                    <input type="number" value={s.stock} onChange={(e) => updateSize(i, 'stock', Math.max(0, Number(e.target.value) || 0))} min="0" className="text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400" style={{ padding: '6px 10px', width: '100%' }} />
+                                                </div>
+                                                <div className="flex flex-col flex-1 min-w-0">
+                                                    <span className="text-[0.6rem] text-gray-400 font-semibold uppercase mb-0.5">Price ($)</span>
+                                                    <input type="number" value={s.price} onChange={(e) => updateSize(i, 'price', e.target.value)} placeholder="—" min="0" className="text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400" style={{ padding: '6px 10px', width: '100%' }} />
+                                                </div>
+                                                <button type="button" onClick={() => removeSize(i)} className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : <div className="text-center" style={{ padding: '1.5rem 0' }}><p className="text-xs text-gray-400">Click a size above or add a custom size to get started.</p></div>}
                             </div>
-                            {newPreviews.length > 0 && (
-                                <div className="flex flex-wrap gap-3 mt-4">
-                                    {newPreviews.map((preview, idx) => (
-                                        <div key={idx} className="relative">
-                                            <img src={preview} alt={`New ${idx + 1}`} className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
-                                            <button type="button" onClick={() => removeNewImage(idx)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 cursor-pointer">x</button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* ── Footer ── */}
-                <div className="shrink-0 flex items-center" style={{ padding: '20px 32px', borderTop: '1px solid #E5E7EB', gap: '12px' }}>
-                    <button type="button" onClick={handleDelete} disabled={isLoading} className="px-5 text-sm font-medium rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer" style={{ height: '48px' }}>Delete</button>
+                {/* Footer */}
+                <div className="shrink-0 flex items-center" style={{ padding: '16px 28px', borderTop: '1px solid #e5e7eb', gap: '12px' }}>
+                    <button type="button" onClick={handleDelete} disabled={isLoading} className="px-5 text-sm font-medium rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer" style={{ height: '44px' }}>Delete</button>
                     <div className="flex-1" />
-                    <button type="button" onClick={onClose} className="px-5 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" style={{ height: '48px', minWidth: '100px' }}>Cancel</button>
-                    <button type="button" onClick={handleSave} disabled={isLoading}
-                        className={`px-6 text-sm font-semibold text-white rounded-lg transition-all cursor-pointer ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'}`}
-                        style={{ backgroundColor: '#EFBF04', height: '48px', minWidth: '130px' }}>
-                        {isLoading ? (
-                            <span className="flex items-center justify-center gap-2">
-                                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
-                                Saving...
-                            </span>
-                        ) : 'Save Changes'}
+                    <button type="button" onClick={onClose} className="px-5 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" style={{ height: '44px' }}>Cancel</button>
+                    <button type="button" onClick={handleSave} disabled={isLoading} className={`px-6 text-sm font-semibold text-white rounded-lg transition-all cursor-pointer ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'}`} style={{ backgroundColor: '#EFBF04', height: '44px', minWidth: '130px' }}>
+                        {isLoading ? <span className="flex items-center justify-center gap-2"><svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>Saving...</span> : 'Save Changes'}
                     </button>
                 </div>
             </div>

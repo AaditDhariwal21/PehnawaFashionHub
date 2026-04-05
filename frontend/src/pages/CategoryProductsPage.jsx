@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Heart } from 'lucide-react';
 import Navbar from '../components/Navbar';
+import { useWishlist } from '../context/WishlistContext';
 import formatPrice from '../utils/formatPrice';
 
 const CategoryProductsPage = () => {
     const { categoryName } = useParams();
     const navigate = useNavigate();
+    const { isWishlisted, toggleWishlist } = useWishlist();
 
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -169,6 +171,21 @@ const CategoryProductsPage = () => {
                                         {/* Hover overlay */}
                                         <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl" />
 
+                                        {/* Wishlist heart */}
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); toggleWishlist(product._id); }}
+                                            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
+                                        >
+                                            <Heart
+                                                className="w-4 h-4 transition-colors"
+                                                strokeWidth={2}
+                                                style={{
+                                                    fill: isWishlisted(product._id) ? '#ef4444' : 'none',
+                                                    color: isWishlisted(product._id) ? '#ef4444' : '#6b7280',
+                                                }}
+                                            />
+                                        </button>
+
                                         {/* Special Tag */}
                                         {product.specialTag && (
                                             <span
@@ -195,7 +212,14 @@ const CategoryProductsPage = () => {
                                             className="font-bold text-gray-900"
                                             style={{ fontSize: '1rem', marginTop: '0.3rem' }}
                                         >
-                                            {formatPrice(product.price)}
+                                            {product.sellingPrice != null ? (
+                                                <>
+                                                    {formatPrice(product.sellingPrice)}
+                                                    <span style={{ textDecoration: 'line-through', color: '#9ca3af', marginLeft: '0.4rem', fontSize: '0.85em' }}>
+                                                        {formatPrice(product.price)}
+                                                    </span>
+                                                </>
+                                            ) : formatPrice(product.price)}
                                         </p>
                                     </div>
                                 </div>

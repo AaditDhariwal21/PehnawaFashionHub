@@ -156,7 +156,7 @@ const CartPage = () => {
                         const lineTotal = item.price * item.quantity;
                         return (
                             <div
-                                key={`${item.productId}-${item.size}`}
+                                key={`${item.productId}-${item.size}-${item.color || ''}`}
                                 style={{
                                     display: 'grid',
                                     gridTemplateColumns: '2fr 1fr 1fr 1fr',
@@ -219,12 +219,17 @@ const CartPage = () => {
                                             {item.name}
                                         </p>
                                         {item.size && (
-                                            <p style={{ fontSize: '0.8rem', color: '#9ca3af', marginBottom: '0.35rem' }}>
+                                            <p style={{ fontSize: '0.8rem', color: '#9ca3af', marginBottom: '0.2rem' }}>
                                                 Size: <span style={{ color: '#6b7280' }}>{item.size}</span>
                                             </p>
                                         )}
+                                        {item.color && (
+                                            <p style={{ fontSize: '0.8rem', color: '#9ca3af', marginBottom: '0.35rem' }}>
+                                                Color: <span style={{ color: '#6b7280' }}>{item.color}</span>
+                                            </p>
+                                        )}
                                         <button
-                                            onClick={() => removeFromCart(item.productId, item.size)}
+                                            onClick={() => removeFromCart(item.productId, item.size, item.color || '')}
                                             style={{
                                                 display: 'flex',
                                                 alignItems: 'center',
@@ -264,7 +269,7 @@ const CartPage = () => {
                                     }}
                                 >
                                     <button
-                                        onClick={() => updateQuantity(item.productId, item.size, item.quantity - 1)}
+                                        onClick={() => updateQuantity(item.productId, item.size, item.color || '', item.quantity - 1)}
                                         disabled={item.quantity <= 1}
                                         style={{
                                             width: '2.2rem',
@@ -300,7 +305,7 @@ const CartPage = () => {
                                         {item.quantity}
                                     </span>
                                     <button
-                                        onClick={() => updateQuantity(item.productId, item.size, item.quantity + 1)}
+                                        onClick={() => updateQuantity(item.productId, item.size, item.color || '', item.quantity + 1)}
                                         style={{
                                             width: '2.2rem',
                                             height: '2.2rem',

@@ -38,16 +38,45 @@ const ShopByCategorySection = () => {
     }, []);
 
     return (
-        <div className="w-full flex flex-col justify-center items-center" style={{ paddingTop: '3rem', paddingBottom: '6rem', gap: '3rem', background: 'linear-gradient(to bottom, #FAD76C 0%, #FAD76C 85%, #FFFFFF 100%)' }}>
+        <div
+            className="w-full flex flex-col items-center"
+            style={{
+                paddingTop: 'clamp(1.5rem, 4vw, 3rem)',
+                paddingBottom: 'clamp(2.5rem, 6vw, 6rem)',
+                gap: 'clamp(1.25rem, 3vw, 3rem)',
+                background: 'linear-gradient(to bottom, #FAD76C 0%, #FAD76C 85%, #FFFFFF 100%)',
+            }}
+        >
             {/* Section Title */}
-            <div className="flex justify-center items-center">
-                <h2 className="text-5xl font-light text-gray-900 tracking-wide uppercase">
-                    Shop by Category
-                </h2>
-            </div>
+            <h2
+                className="font-light text-gray-900 tracking-wide uppercase text-center px-4"
+                style={{ fontSize: 'clamp(1.5rem, 4vw, 3rem)' }}
+            >
+                Shop by Category
+            </h2>
 
-            {/* Categories Grid */}
-            <div className="grid grid-cols-6" style={{ gap: '2.5rem' }}>
+            {/*
+                12 categories → equal rows at every breakpoint:
+                  default : 1 col  × 12 rows
+                  ≥480px  : 2 cols ×  6 rows
+                  ≥640px  : 3 cols ×  4 rows
+                  ≥768px  : 4 cols ×  3 rows
+                  ≥1024px : 6 cols ×  2 rows
+            */}
+            <div
+                className="
+                    grid w-full mx-auto px-6 sm:px-8 lg:px-12
+                    grid-cols-1
+                    min-[480px]:grid-cols-2
+                    sm:grid-cols-3
+                    md:grid-cols-4
+                    lg:grid-cols-6
+                "
+                style={{
+                    gap: 'clamp(1rem, 2.5vw, 2.5rem)',
+                    maxWidth: '1100px',
+                }}
+            >
                 {categories.map((category) => {
                     const cover = covers[category.name];
                     const coverImage = cover?.image || null;
@@ -56,11 +85,10 @@ const ShopByCategorySection = () => {
                         <div
                             key={category.id}
                             className="group cursor-pointer"
-                            style={{ width: '14rem' }}
                             onClick={() => navigate(`/products/${encodeURIComponent(category.name)}`)}
                         >
                             {/* Category Image */}
-                            <div className="aspect-square bg-stone-100 rounded-lg overflow-hidden relative" style={{ marginBottom: '0.75rem' }}>
+                            <div className="aspect-square bg-stone-100 rounded-lg overflow-hidden relative mb-2">
                                 {coverImage ? (
                                     <img
                                         src={coverImage}
@@ -72,12 +100,14 @@ const ShopByCategorySection = () => {
                                         <div className="w-12 h-12 rounded-full bg-stone-400/30"></div>
                                     </div>
                                 )}
-                                {/* Hover overlay */}
                                 <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                             </div>
 
                             {/* Category Name */}
-                            <p className="text-sm font-medium text-gray-900 uppercase tracking-wider text-center">
+                            <p
+                                className="font-medium text-gray-900 uppercase tracking-wider text-center"
+                                style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)' }}
+                            >
                                 {category.name}
                             </p>
                         </div>

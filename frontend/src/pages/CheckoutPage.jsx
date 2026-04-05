@@ -205,6 +205,7 @@ const CheckoutPage = () => {
                         productId: ci.productId,
                         image: ci.image || '',
                         size: ci.size || '',
+                        color: ci.color || '',
                         quantity: ci.quantity,
                     })),
                     shippingAddress,
@@ -553,7 +554,7 @@ const CheckoutPage = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.25rem' }}>
                             {checkoutItems.map((item) => (
                                 <div
-                                    key={`${item.productId}-${item.size}`}
+                                    key={`${item.productId}-${item.size}-${item.color || ''}`}
                                     style={{
                                         display: 'flex',
                                         gap: '0.85rem',
@@ -636,6 +637,11 @@ const CheckoutPage = () => {
                                         {item.size && (
                                             <p style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
                                                 Size: <span style={{ color: '#6b7280' }}>{item.size}</span>
+                                            </p>
+                                        )}
+                                        {item.color && (
+                                            <p style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                                                Color: <span style={{ color: '#6b7280' }}>{item.color}</span>
                                             </p>
                                         )}
                                     </div>

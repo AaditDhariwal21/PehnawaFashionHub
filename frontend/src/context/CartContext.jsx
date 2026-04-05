@@ -8,7 +8,9 @@ const BUYNOW_KEY = 'pehnawa_buyNow';
 const readCart = () => {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        return raw ? JSON.parse(raw) : [];
+        const items = raw ? JSON.parse(raw) : [];
+        // Migrate old items that lack `color` field
+        return items.map((i) => ({ ...i, color: i.color || '' }));
     } catch {
         return [];
     }
@@ -27,6 +29,10 @@ const readBuyNow = () => {
     }
 };
 
+/* Cart item identity: productId + size + color */
+const itemMatch = (a, b) =>
+    a.productId === b.productId && a.size === b.size && (a.color || '') === (b.color || '');
+
 export const CartProvider = ({ children }) => {
     const [cartItems, setCartItems] = useState(readCart);
     const [isCartOpen, setIsCartOpen] = useState(false);
@@ -43,33 +49,32 @@ export const CartProvider = ({ children }) => {
     const closeCart = useCallback(() => setIsCartOpen(false), []);
 
     const addToCart = useCallback((item) => {
+        const normalized = { ...item, color: item.color || '' };
         setCartItems((prev) => {
-            const idx = prev.findIndex(
-                (i) => i.productId === item.productId && i.size === item.size
-            );
+            const idx = prev.findIndex((i) => itemMatch(i, normalized));
             if (idx !== -1) {
                 const updated = [...prev];
-                updated[idx] = { ...updated[idx], quantity: updated[idx].quantity + (item.quantity || 1) };
+                updated[idx] = { ...updated[idx], quantity: updated[idx].quantity + (normalized.quantity || 1) };
                 return updated;
             }
-            return [...prev, { ...item, quantity: item.quantity || 1 }];
+            return [...prev, { ...normalized, quantity: normalized.quantity || 1 }];
         });
         setJustAdded(true);
         if (addTimerRef.current) clearTimeout(addTimerRef.current);
         addTimerRef.current = setTimeout(() => setJustAdded(false), 3000);
     }, []);
 
-    const removeFromCart = useCallback((productId, size) => {
+    const removeFromCart = useCallback((productId, size, color = '') => {
         setCartItems((prev) => prev.filter(
-            (i) => !(i.productId === productId && i.size === size)
+            (i) => !(i.productId === productId && i.size === size && (i.color || '') === color)
         ));
     }, []);
 
-    const updateQuantity = useCallback((productId, size, qty) => {
+    const updateQuantity = useCallback((productId, size, color = '', qty) => {
         if (qty < 1) return;
         setCartItems((prev) =>
             prev.map((i) =>
-                i.productId === productId && i.size === size
+                i.productId === productId && i.size === size && (i.color || '') === color
                     ? { ...i, quantity: qty }
                     : i
             )
