@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Heart } from 'lucide-react';
+import { ChevronLeft, Heart, Scale } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useWishlist } from '../context/WishlistContext';
+import { useCompare } from '../context/CompareContext';
 import formatPrice from '../utils/formatPrice';
+import { startingPrice } from '../utils/variants.js';
 import './SearchResultsPage.css';
 
 const SearchResultsPage = () => {
@@ -11,6 +13,7 @@ const SearchResultsPage = () => {
     const query = searchParams.get('q') || '';
     const navigate = useNavigate();
     const { isWishlisted, toggleWishlist } = useWishlist();
+    const { isInCompare, toggleCompare } = useCompare();
 
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -161,20 +164,48 @@ const SearchResultsPage = () => {
                                         {product.specialTag && (
                                             <span className="search-results__card-tag">{product.specialTag}</span>
                                         )}
+                                        {/* Compare toggle */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleCompare({
+                                                    productId: product._id,
+                                                    name: product.name,
+                                                    image: imageUrl || '',
+                                                    price: startingPrice(product),
+                                                    category: product.category,
+                                                });
+                                            }}
+                                            className="absolute bottom-3 left-3 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
+                                            style={{ zIndex: 2 }}
+                                            title={isInCompare(product._id) ? 'Remove from compare' : 'Add to compare'}
+                                        >
+                                            <Scale
+                                                className="w-4 h-4 transition-colors"
+                                                strokeWidth={2}
+                                                style={{
+                                                    color: isInCompare(product._id) ? '#EFBF04' : '#6b7280',
+                                                }}
+                                            />
+                                        </button>
                                     </div>
 
                                     {/* Info */}
                                     <div className="search-results__card-info">
                                         <h3 className="search-results__card-name">{product.name}</h3>
                                         <p className="search-results__card-price">
-                                            {product.sellingPrice != null ? (
-                                                <>
-                                                    {formatPrice(product.sellingPrice)}
-                                                    <span style={{ textDecoration: 'line-through', color: '#9ca3af', marginLeft: '0.4rem', fontSize: '0.85em', fontWeight: 400 }}>
-                                                        {formatPrice(product.price)}
-                                                    </span>
-                                                </>
-                                            ) : formatPrice(product.price)}
+                                            {(() => {
+                                                const from = startingPrice(product);
+                                                const discounted = from < product.price;
+                                                return discounted ? (
+                                                    <>
+                                                        {formatPrice(from)}
+                                                        <span style={{ textDecoration: 'line-through', color: '#9ca3af', marginLeft: '0.4rem', fontSize: '0.85em', fontWeight: 400 }}>
+                                                            {formatPrice(product.price)}
+                                                        </span>
+                                                    </>
+                                                ) : formatPrice(from);
+                                            })()}
                                         </p>
                                     </div>
                                 </div>

@@ -1,5 +1,6 @@
 import Order from "../models/Order.js";
 import Product from "../models/Products.js";
+import { findVariant } from "../utils/variants.js";
 
 const DEFAULT_SHIPPING_COST = 8;
 
@@ -19,8 +20,8 @@ export const createOrder = async (req, res) => {
             return res.status(400).json({ success: false, message: "Shipping address is required." });
         }
 
-        /* ── Phase 1: Validate every product exists & has enough stock for the requested size ── */
-        const resolved = []; // { product, qty, serverPrice }
+        /* ── Phase 1: Resolve every variant + validate stock ── */
+        const resolved = [];
         let subtotal = 0;
 
         for (const item of items) {
@@ -33,91 +34,73 @@ export const createOrder = async (req, res) => {
             }
 
             const qty = Number(item.quantity) || 1;
-            const requestedSize = item.size || "";
+            const color = item.color || "";
+            const size = item.size || "";
 
-            /* Size-based stock validation */
-            if (product.sizes && product.sizes.length > 0 && requestedSize) {
-                const sizeEntry = product.sizes.find((s) => s.size === requestedSize);
-                if (!sizeEntry) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `Size "${requestedSize}" is not available for "${product.name}".`,
-                    });
-                }
-                if (sizeEntry.stock < qty) {
-                    return res.status(400).json({
-                        success: false,
-                        message: sizeEntry.stock === 0
-                            ? `"${product.name}" (${requestedSize}) is out of stock.`
-                            : `Insufficient stock for "${product.name}" (${requestedSize}). Available: ${sizeEntry.stock}, Requested: ${qty}`,
-                    });
-                }
-            } else if (product.totalStock != null && product.totalStock < qty) {
+            const variant = findVariant(product, color, size);
+            if (!variant) {
                 return res.status(400).json({
                     success: false,
-                    message: product.totalStock === 0
-                        ? `"${product.name}" is out of stock.`
-                        : `Insufficient stock for "${product.name}". Available: ${product.totalStock}, Requested: ${qty}`,
+                    message: `Variant ${color || "?"} / ${size || "?"} not available for "${product.name}".`,
+                });
+            }
+            if (variant.stock < qty) {
+                return res.status(400).json({
+                    success: false,
+                    message: variant.stock === 0
+                        ? `"${product.name}" (${color} / ${size}) is out of stock.`
+                        : `Insufficient stock for "${product.name}" (${color} / ${size}). Available: ${variant.stock}, Requested: ${qty}`,
                 });
             }
 
             resolved.push({
                 product,
                 qty,
-                serverPrice: product.price,
+                serverPrice: variant.price,
                 image: item.image || (product.images?.[0]?.url ?? ""),
-                size: requestedSize,
+                color,
+                size,
             });
 
-            subtotal += product.price * qty;
+            subtotal += variant.price * qty;
         }
 
-        /* ── Phase 2: Deduct stock atomically (race-condition safe) ── */
+        /* ── Phase 2: Deduct stock atomically (race-safe per variant) ── */
         const deducted = [];
 
         for (const r of resolved) {
-            let result;
-
-            if (r.product.sizes && r.product.sizes.length > 0 && r.size) {
-                result = await Product.updateOne(
-                    {
-                        _id: r.product._id,
-                        sizes: { $elemMatch: { size: r.size, stock: { $gte: r.qty } } },
+            const result = await Product.updateOne(
+                {
+                    _id: r.product._id,
+                    variants: {
+                        $elemMatch: {
+                            color: r.color,
+                            size: r.size,
+                            stock: { $gte: r.qty },
+                        },
                     },
-                    { $inc: { "sizes.$.stock": -r.qty, totalStock: -r.qty } }
-                );
-            } else if (r.product.totalStock != null) {
-                result = await Product.updateOne(
-                    { _id: r.product._id, totalStock: { $gte: r.qty } },
-                    { $inc: { totalStock: -r.qty } }
-                );
-            } else {
-                continue;
-            }
+                },
+                { $inc: { "variants.$.stock": -r.qty } }
+            );
 
             if (result.modifiedCount === 0) {
-                /* Rollback previously deducted items */
+                /* Rollback previously deducted variants */
                 for (const d of deducted) {
-                    if (d.size) {
-                        await Product.updateOne(
-                            { _id: d.productId, "sizes.size": d.size },
-                            { $inc: { "sizes.$.stock": d.qty, totalStock: d.qty } }
-                        );
-                    } else {
-                        await Product.updateOne(
-                            { _id: d.productId },
-                            { $inc: { totalStock: d.qty } }
-                        );
-                    }
+                    await Product.updateOne(
+                        {
+                            _id: d.productId,
+                            variants: { $elemMatch: { color: d.color, size: d.size } },
+                        },
+                        { $inc: { "variants.$.stock": d.qty } }
+                    );
                 }
-                const sizeLabel = r.size ? ` (${r.size})` : "";
                 return res.status(400).json({
                     success: false,
-                    message: `"${r.product.name}"${sizeLabel} just sold out. Please refresh and try again.`,
+                    message: `"${r.product.name}" (${r.color} / ${r.size}) just sold out. Please refresh and try again.`,
                 });
             }
 
-            deducted.push({ productId: r.product._id, size: r.size, qty: r.qty });
+            deducted.push({ productId: r.product._id, color: r.color, size: r.size, qty: r.qty });
         }
 
         /* ── Phase 3: Build order items array ── */
@@ -125,6 +108,7 @@ export const createOrder = async (req, res) => {
             productId: r.product._id,
             name: r.product.name,
             image: r.image,
+            color: r.color,
             size: r.size,
             price: r.serverPrice,
             quantity: r.qty,

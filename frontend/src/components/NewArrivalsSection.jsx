@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Heart } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Heart, Scale } from 'lucide-react';
 import { useWishlist } from '../context/WishlistContext';
+import { useCompare } from '../context/CompareContext';
 import formatPrice from '../utils/formatPrice';
+import { startingPrice } from '../utils/variants.js';
 
 const CARD_MIN_WIDTH = 220;  // px — minimum comfortable card width
 const CARD_GAP = 24;         // px — gap between cards
@@ -12,6 +14,7 @@ const MAX_CARDS = 5;         // never show more than 5 at once
 const NewArrivalsSection = () => {
     const navigate = useNavigate();
     const { isWishlisted, toggleWishlist } = useWishlist();
+    const { isInCompare, toggleCompare } = useCompare();
     const containerRef = useRef(null);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -228,6 +231,30 @@ const NewArrivalsSection = () => {
                                             }}
                                         />
                                     </button>
+
+                                    {/* Compare toggle */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleCompare({
+                                                productId: product._id,
+                                                name: product.name,
+                                                image: product.images?.[0]?.url || '',
+                                                price: startingPrice(product),
+                                                category: product.category,
+                                            });
+                                        }}
+                                        className="absolute bottom-2 left-2 w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
+                                        title={isInCompare(product._id) ? 'Remove from compare' : 'Add to compare'}
+                                    >
+                                        <Scale
+                                            className="w-3.5 h-3.5 transition-colors"
+                                            strokeWidth={2}
+                                            style={{
+                                                color: isInCompare(product._id) ? '#EFBF04' : '#6b7280',
+                                            }}
+                                        />
+                                    </button>
                                 </div>
 
                                 {/* Product Info */}
@@ -242,14 +269,18 @@ const NewArrivalsSection = () => {
                                         className="text-gray-600 font-medium"
                                         style={{ fontSize: 'clamp(0.75rem, 1.5vw, 1rem)' }}
                                     >
-                                        {product.sellingPrice != null ? (
-                                            <>
-                                                {formatPrice(product.sellingPrice)}
-                                                <span style={{ textDecoration: 'line-through', color: '#9ca3af', marginLeft: '0.35rem', fontSize: '0.85em' }}>
-                                                    {formatPrice(product.price)}
-                                                </span>
-                                            </>
-                                        ) : formatPrice(product.price)}
+                                        {(() => {
+                                            const from = startingPrice(product);
+                                            const discounted = from < product.price;
+                                            return discounted ? (
+                                                <>
+                                                    {formatPrice(from)}
+                                                    <span style={{ textDecoration: 'line-through', color: '#9ca3af', marginLeft: '0.35rem', fontSize: '0.85em' }}>
+                                                        {formatPrice(product.price)}
+                                                    </span>
+                                                </>
+                                            ) : formatPrice(from);
+                                        })()}
                                     </p>
                                 </div>
                             </div>

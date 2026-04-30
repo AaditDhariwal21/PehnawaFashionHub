@@ -1,14 +1,5 @@
 import mongoose from "mongoose";
 
-const sizeEntrySchema = new mongoose.Schema(
-    {
-        size: { type: String, required: true },
-        stock: { type: Number, required: true, min: 0 },
-        price: { type: Number, default: null }, // optional per-size price override
-    },
-    { _id: false }
-);
-
 const colorImageSchema = new mongoose.Schema(
     {
         colorName: { type: String, required: true },
@@ -18,6 +9,21 @@ const colorImageSchema = new mongoose.Schema(
                 publicId: { type: String, required: true },
             },
         ],
+    },
+    { _id: false }
+);
+
+/**
+ * A variant is a unique (color, size) combination with its own
+ * price and stock. This is the unit of inventory and pricing —
+ * the single source of truth for stock across the entire system.
+ */
+const variantSchema = new mongoose.Schema(
+    {
+        color: { type: String, required: true, trim: true },
+        size: { type: String, required: true, trim: true },
+        price: { type: Number, required: true, min: 0 },
+        stock: { type: Number, required: true, min: 0 },
     },
     { _id: false }
 );
@@ -38,12 +44,8 @@ const productSchema = new mongoose.Schema(
             required: true,
         },
         price: {
-            type: Number, // baseMRP
+            type: Number, // MRP — used for strikethrough only
             required: true,
-        },
-        sellingPrice: {
-            type: Number, // discounted price (optional)
-            default: null,
         },
         category: {
             type: String,
@@ -51,22 +53,12 @@ const productSchema = new mongoose.Schema(
         },
         images: [
             {
-                url: {
-                    type: String,
-                    required: true,
-                },
-                publicId: {
-                    type: String,
-                    required: true,
-                },
+                url: { type: String, required: true },
+                publicId: { type: String, required: true },
             },
         ],
         colors: [colorImageSchema],
-        sizes: [sizeEntrySchema],
-        totalStock: {
-            type: Number,
-            default: 0,
-        },
+        variants: [variantSchema],
         weight: {
             type: Number,
             required: true,
@@ -80,14 +72,24 @@ const productSchema = new mongoose.Schema(
             default: false,
         },
     },
-    { timestamps: true }
+    {
+        timestamps: true,
+        toJSON: { virtuals: true },
+        toObject: { virtuals: true },
+    }
 );
 
-/* Recompute totalStock from sizes before every save */
-productSchema.pre("save", function () {
-    if (this.sizes && this.sizes.length > 0) {
-        this.totalStock = this.sizes.reduce((sum, s) => sum + s.stock, 0);
-    }
+/**
+ * `totalStock` is a derived quantity, not a stored field. Defining it
+ * as a virtual guarantees it can never drift from `variants[].stock`,
+ * and `toJSON: { virtuals: true }` ensures every API response includes
+ * the correct value automatically.
+ */
+productSchema.virtual("totalStock").get(function () {
+    return (this.variants || []).reduce(
+        (sum, v) => sum + (Number(v.stock) || 0),
+        0
+    );
 });
 
 export default mongoose.model("Product", productSchema);

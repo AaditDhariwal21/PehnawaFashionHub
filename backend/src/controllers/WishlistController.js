@@ -5,7 +5,8 @@ export const getWishlist = async (req, res) => {
     try {
         const wishlist = await Wishlist.findOne({ user: req.user.id }).populate({
             path: "products",
-            select: "name price images category specialTag totalStock",
+            // `variants` must be selected so the totalStock virtual can compute.
+            select: "name price images category specialTag variants",
         });
 
         res.status(200).json({

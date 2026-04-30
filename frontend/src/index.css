@@ -100,3 +100,44 @@ body {
     color: #9ca3af;
     font-style: normal;
 }
+
+/* ── Compare Bar animations ── */
+@keyframes compareSlideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes compareToastIn {
+    from {
+        transform: translateX(-50%) translateY(0.5rem);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ── Related products horizontal scroll ── */
+.related-products-scroll::-webkit-scrollbar {
+    height: 4px;
+}
+
+.related-products-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.related-products-scroll::-webkit-scrollbar-thumb {
+    background: #e5e7eb;
+    border-radius: 2px;
+}
+
+.related-products-scroll::-webkit-scrollbar-thumb:hover {
+    background: #d1d5db;
+}

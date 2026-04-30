@@ -23,9 +23,12 @@ import OrderConfirmationPage from './pages/OrderConfirmationPage';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
+import { CompareProvider } from './context/CompareContext';
 import CartDrawer from './components/CartDrawer';
+import CompareBar from './components/CompareBar';
 import AdminToggleButton from './components/AdminToggleButton';
 import WishlistPage from './pages/WishlistPage';
+import ComparePage from './pages/ComparePage';
 
 function App() {
   return (
@@ -34,7 +37,9 @@ function App() {
       <AuthProvider>
         <CartProvider>
           <WishlistProvider>
+          <CompareProvider>
           <CartDrawer />
+          <CompareBar />
           <AdminToggleButton />
           <Routes>
             <Route path="/" element={<HomePage />} />
@@ -52,6 +57,7 @@ function App() {
             <Route path="/order-confirmation/:id" element={<OrderConfirmationPage />} />
             <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
             <Route path="/wishlist" element={<WishlistPage />} />
+            <Route path="/compare" element={<ComparePage />} />
             <Route path="/search" element={<SearchResultsPage />} />
             <Route path="/about-us" element={<AboutUsPage />} />
             <Route path="/contact-us" element={<ContactUsPage />} />
@@ -60,6 +66,7 @@ function App() {
             <Route path="/shipping-policy" element={<ShippingPolicyPage />} />
             <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           </Routes>
+          </CompareProvider>
           </WishlistProvider>
         </CartProvider>
       </AuthProvider>

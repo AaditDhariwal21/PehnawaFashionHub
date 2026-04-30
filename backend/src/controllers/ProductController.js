@@ -1,4 +1,5 @@
 import Product from "../models/Products.js";
+import { validateVariants } from "../utils/variants.js";
 
 // Get all products (Public - anyone can access)
 export const getAllProducts = async (req, res) => {
@@ -99,8 +100,8 @@ export const getProductsBySpecialTag = async (req, res) => {
 export const createProduct = async (req, res) => {
     try {
         const {
-            name, description, shortDescription, price, sellingPrice,
-            category, images, colors, sizes, specialTag, weight, isCategoryCover,
+            name, description, shortDescription, price,
+            category, images, colors, variants, specialTag, weight, isCategoryCover,
         } = req.body;
 
         if (!name || !description || !price || !category || !weight) {
@@ -110,21 +111,12 @@ export const createProduct = async (req, res) => {
             });
         }
 
-        // Validate sellingPrice
-        if (sellingPrice != null && sellingPrice !== "" && Number(sellingPrice) >= Number(price)) {
-            return res.status(400).json({ success: false, message: "Selling price must be less than MRP." });
+        // Validate variant matrix
+        const result = validateVariants(variants, colors);
+        if (!result.ok) {
+            return res.status(400).json({ success: false, message: result.message });
         }
-
-        // Validate sizes
-        const parsedSizes = sizes || [];
-        const sizeNames = parsedSizes.map((s) => s.size);
-        if (new Set(sizeNames).size !== sizeNames.length) {
-            return res.status(400).json({ success: false, message: "Duplicate sizes are not allowed." });
-        }
-        if (parsedSizes.some((s) => s.stock < 0)) {
-            return res.status(400).json({ success: false, message: "Stock cannot be negative." });
-        }
-        const totalStock = parsedSizes.reduce((sum, s) => sum + (Number(s.stock) || 0), 0);
+        const cleanVariants = result.variants;
 
         const categoryCover = isCategoryCover === true || isCategoryCover === "true";
 
@@ -141,12 +133,10 @@ export const createProduct = async (req, res) => {
             shortDescription: shortDescription || "",
             description,
             price,
-            sellingPrice: sellingPrice != null && sellingPrice !== "" ? Number(sellingPrice) : null,
             category,
             images: images || [],
             colors: colors || [],
-            sizes: parsedSizes,
-            totalStock,
+            variants: cleanVariants,
             weight,
             specialTag: specialTag || null,
             isCategoryCover: categoryCover,
@@ -170,54 +160,65 @@ export const createProduct = async (req, res) => {
 };
 
 // Update product (Admin only)
+//
+// Implementation note: uses findById + .save() rather than
+// findByIdAndUpdate. findByIdAndUpdate has historically unreliable
+// behaviour when replacing arrays of subdocuments; .save() gives us
+// full middleware + a clean, well-defined array replacement.
 export const updateProduct = async (req, res) => {
     try {
-        // If setting isCategoryCover to true, unset previous covers in that category
-        if (req.body.isCategoryCover === true || req.body.isCategoryCover === "true") {
-            const category = req.body.category;
-            let targetCategory = category;
-            if (!targetCategory) {
-                const existing = await Product.findById(req.params.id).select("category");
-                targetCategory = existing?.category;
-            }
+        const product = await Product.findById(req.params.id);
+        if (!product) {
+            return res.status(404).json({ success: false, message: "Product not found" });
+        }
+
+        const wantsCover = req.body.isCategoryCover === true || req.body.isCategoryCover === "true";
+
+        // If marking as category cover, unset any other cover in that category first.
+        if (wantsCover) {
+            const targetCategory = req.body.category || product.category;
             if (targetCategory) {
                 await Product.updateMany(
-                    { category: targetCategory, isCategoryCover: true, _id: { $ne: req.params.id } },
+                    { category: targetCategory, isCategoryCover: true, _id: { $ne: product._id } },
                     { $set: { isCategoryCover: false } }
                 );
             }
         }
 
-        // Recompute totalStock if sizes are provided
-        if (req.body.sizes) {
-            const sizes = req.body.sizes;
-            const sizeNames = sizes.map((s) => s.size);
-            if (new Set(sizeNames).size !== sizeNames.length) {
-                return res.status(400).json({ success: false, message: "Duplicate sizes are not allowed." });
+        // Validate variants if the client sent them. If the client also sent
+        // colors, validate against the new color list; otherwise re-use the
+        // existing one so single-field updates don't trip the "color has no
+        // matching images" check.
+        if (req.body.variants !== undefined) {
+            const colorList = req.body.colors !== undefined ? req.body.colors : product.colors;
+            const result = validateVariants(req.body.variants, colorList);
+            if (!result.ok) {
+                return res.status(400).json({ success: false, message: result.message });
             }
-            if (sizes.some((s) => s.stock < 0)) {
-                return res.status(400).json({ success: false, message: "Stock cannot be negative." });
-            }
-            req.body.totalStock = sizes.reduce((sum, s) => sum + (Number(s.stock) || 0), 0);
+            product.variants = result.variants;
+            // totalStock is a virtual derived from variants — no manual set needed.
         }
 
-        const product = await Product.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true, runValidators: true }
-        );
-
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: "Product not found",
-            });
+        // Apply scalar + simple array fields. Using Object.assign would clobber
+        // mongoose internals; assign explicitly to known paths instead.
+        const assignable = [
+            "name", "shortDescription", "description", "price",
+            "category", "weight", "specialTag", "images", "colors",
+        ];
+        for (const key of assignable) {
+            if (req.body[key] !== undefined) product[key] = req.body[key];
         }
+        product.isCategoryCover = wantsCover;
+
+        await product.save();
+
+        // Re-read so the response reflects the persisted state, not in-memory.
+        const fresh = await Product.findById(product._id);
 
         res.status(200).json({
             success: true,
             message: "Product updated successfully",
-            product,
+            product: fresh,
         });
     } catch (error) {
         console.error("Update Product Error:", error);

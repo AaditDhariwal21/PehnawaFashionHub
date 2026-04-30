@@ -1,12 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Heart } from 'lucide-react';
+import { ChevronLeft, Heart, Ruler } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import formatPrice from '../utils/formatPrice';
-import { getEffectivePrice, shouldShowDiscount } from '../utils/getEffectivePrice';
+import {
+    colorsWithVariants,
+    allSizes,
+    findVariant,
+    sizeStatus,
+    displayPrice,
+    hasDiscount,
+    defaultColor,
+} from '../utils/variants.js';
 import { getDisplayImages } from '../utils/getDisplayImages';
+import { getSizeChart } from '../utils/sizeCharts.js';
+import RelatedProducts from '../components/RelatedProducts';
+import SizeChartModal from '../components/SizeChartModal';
 
 const ProductDetailsPage = () => {
     const { id } = useParams();
@@ -20,6 +31,7 @@ const ProductDetailsPage = () => {
     const [selectedImage, setSelectedImage] = useState(0);
     const [selectedSize, setSelectedSize] = useState(null);
     const [selectedColor, setSelectedColor] = useState(null);
+    const [sizeChartOpen, setSizeChartOpen] = useState(false);
 
     useEffect(() => {
         const fetchProduct = async () => {
@@ -29,10 +41,7 @@ const ProductDetailsPage = () => {
                 const data = await response.json();
                 if (!data.success) throw new Error(data.message || 'Product not found');
                 setProduct(data.product);
-                // Auto-select first color if colors exist
-                if (data.product.colors?.length) {
-                    setSelectedColor(data.product.colors[0].colorName);
-                }
+                setSelectedColor(defaultColor(data.product));
             } catch (err) {
                 setError(err.message);
             } finally {
@@ -46,6 +55,14 @@ const ProductDetailsPage = () => {
     useEffect(() => {
         setSelectedImage(0);
     }, [selectedColor]);
+
+    // If switching color makes the current size unavailable, clear it
+    useEffect(() => {
+        if (!product || !selectedColor || !selectedSize) return;
+        if (sizeStatus(product, selectedColor, selectedSize) !== 'available') {
+            setSelectedSize(null);
+        }
+    }, [product, selectedColor, selectedSize]);
 
     /* ───────────────── Loading State ───────────────── */
     if (loading) {
@@ -87,34 +104,48 @@ const ProductDetailsPage = () => {
     const images = getDisplayImages(product, selectedColor);
     const mainImageUrl = images[selectedImage]?.url || '';
 
-    // Resolve pricing
-    const effectivePrice = getEffectivePrice(product, selectedSize);
-    const showDiscount = shouldShowDiscount(product, selectedSize);
+    // Variant + pricing
+    const selectedVariant = findVariant(product, selectedColor, selectedSize);
+    const effectivePrice = displayPrice(product, selectedColor, selectedSize);
+    const showDiscount = hasDiscount(product, selectedColor, selectedSize);
+
+    const colors = colorsWithVariants(product);
+    const sizes = allSizes(product);
+    const sizeChart = getSizeChart(product.category);
+
+    const isPurchasable = selectedVariant && selectedVariant.stock > 0;
 
     const handleBuyNow = () => {
-        if (!selectedSize) { alert('Please select a size before proceeding.'); return; }
-        if (product.colors?.length && !selectedColor) { alert('Please select a color.'); return; }
-        if (product.totalStock === 0) { alert('This product is currently out of stock.'); return; }
+        if (!selectedColor) { alert('Please select a color.'); return; }
+        if (!selectedSize) { alert('Please select a size.'); return; }
+        if (!selectedVariant) { alert('That combination is not available.'); return; }
+        if (selectedVariant.stock === 0) { alert('That combination is out of stock.'); return; }
         setBuyNowItem({
             productId: product._id,
             name: product.name,
-            price: effectivePrice,
+            price: selectedVariant.price,
             image: images[0]?.url || '',
             size: selectedSize,
-            color: selectedColor || '',
+            color: selectedColor,
             quantity: 1,
         });
         navigate('/checkout');
     };
 
     const handleAddToCart = () => {
+        if (!selectedColor) { alert('Please select a color.'); return; }
+        if (!selectedSize) { alert('Please select a size.'); return; }
+        if (!selectedVariant || selectedVariant.stock === 0) {
+            alert('That combination is unavailable.');
+            return;
+        }
         addToCart({
             productId: product._id,
             name: product.name,
-            price: effectivePrice,
+            price: selectedVariant.price,
             image: images[0]?.url || '',
-            size: selectedSize || '',
-            color: selectedColor || '',
+            size: selectedSize,
+            color: selectedColor,
             quantity: 1,
         });
         openCart();
@@ -205,6 +236,11 @@ const ProductDetailsPage = () => {
 
                         {/* Price */}
                         <div className="flex items-baseline gap-3" style={{ marginBottom: '0.4rem' }}>
+                            {!selectedVariant && (
+                                <span className="text-gray-500 text-xs uppercase tracking-wider" style={{ marginRight: '0.25rem' }}>
+                                    From
+                                </span>
+                            )}
                             <span className="font-bold text-gray-900" style={{ fontSize: '1.75rem' }}>
                                 {formatPrice(effectivePrice)}
                             </span>
@@ -220,12 +256,16 @@ const ProductDetailsPage = () => {
                             )}
                         </div>
 
-                        {/* Stock */}
-                        {product.totalStock !== undefined && (
-                            <p className="text-sm" style={{ marginBottom: '1.5rem', color: product.totalStock === 0 ? '#ef4444' : '#6b7280' }}>
-                                {product.totalStock === 0 ? 'Out of Stock' : (
-                                    <>In Stock — <span style={{ color: product.totalStock > 3 ? '#16a34a' : '#ef4444', fontWeight: 600 }}>{product.totalStock} left</span></>
+                        {/* Stock indicator (variant-aware) */}
+                        {selectedVariant ? (
+                            <p className="text-sm" style={{ marginBottom: '1.5rem', color: selectedVariant.stock === 0 ? '#ef4444' : '#6b7280' }}>
+                                {selectedVariant.stock === 0 ? 'Out of Stock' : (
+                                    <>In Stock — <span style={{ color: selectedVariant.stock > 3 ? '#16a34a' : '#ef4444', fontWeight: 600 }}>{selectedVariant.stock} left</span></>
                                 )}
+                            </p>
+                        ) : (
+                            <p className="text-sm text-gray-400" style={{ marginBottom: '1.5rem' }}>
+                                Select a size to see availability.
                             </p>
                         )}
 
@@ -239,22 +279,23 @@ const ProductDetailsPage = () => {
                         <hr className="border-gray-100" style={{ marginBottom: '1.5rem' }} />
 
                         {/* Color Selector */}
-                        {product.colors && product.colors.length > 0 && (
+                        {colors.length > 0 && (
                             <div style={{ marginBottom: '1.5rem' }}>
                                 <p className="font-bold text-gray-900 uppercase tracking-wide" style={{ fontSize: '0.85rem', marginBottom: '0.85rem' }}>
                                     Select Color {selectedColor && <span className="font-normal normal-case text-gray-500">— {selectedColor}</span>}
                                 </p>
                                 <div className="flex gap-3 flex-wrap">
-                                    {product.colors.map((colorEntry) => {
-                                        const isSelected = selectedColor === colorEntry.colorName;
-                                        const previewImg = colorEntry.images?.[0]?.url;
+                                    {colors.map((colorName) => {
+                                        const colorEntry = product.colors.find((c) => c.colorName === colorName);
+                                        const isSelected = selectedColor === colorName;
+                                        const previewImg = colorEntry?.images?.[0]?.url;
                                         return (
                                             <button
-                                                key={colorEntry.colorName}
-                                                onClick={() => setSelectedColor(colorEntry.colorName)}
+                                                key={colorName}
+                                                onClick={() => setSelectedColor(colorName)}
                                                 className="flex flex-col items-center gap-1 cursor-pointer bg-transparent border-none transition-all duration-200"
                                                 style={{ opacity: isSelected ? 1 : 0.7, transform: isSelected ? 'scale(1.05)' : 'scale(1)' }}
-                                                title={colorEntry.colorName}
+                                                title={colorName}
                                             >
                                                 <div
                                                     className="rounded-lg overflow-hidden"
@@ -264,15 +305,15 @@ const ProductDetailsPage = () => {
                                                     }}
                                                 >
                                                     {previewImg ? (
-                                                        <img src={previewImg} alt={colorEntry.colorName} className="w-full h-full object-cover" />
+                                                        <img src={previewImg} alt={colorName} className="w-full h-full object-cover" />
                                                     ) : (
                                                         <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-400">
-                                                            {colorEntry.colorName.charAt(0)}
+                                                            {colorName.charAt(0)}
                                                         </div>
                                                     )}
                                                 </div>
                                                 <span className="text-xs text-gray-600 font-medium" style={{ maxWidth: '4rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {colorEntry.colorName}
+                                                    {colorName}
                                                 </span>
                                             </button>
                                         );
@@ -281,34 +322,62 @@ const ProductDetailsPage = () => {
                             </div>
                         )}
 
-                        {/* Size Selector */}
-                        {product.sizes && product.sizes.length > 0 && (
+                        {/* Size Selector — derived from selectedColor */}
+                        {sizes.length > 0 && (
                             <div style={{ marginBottom: '2rem' }}>
-                                <p className="font-bold text-gray-900 uppercase tracking-wide" style={{ fontSize: '0.85rem', marginBottom: '0.85rem' }}>
-                                    Select Size
-                                </p>
+                                <div className="flex items-center justify-between" style={{ marginBottom: '0.85rem' }}>
+                                    <p className="font-bold text-gray-900 uppercase tracking-wide" style={{ fontSize: '0.85rem' }}>
+                                        Select Size
+                                    </p>
+                                    {sizeChart && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setSizeChartOpen(true)}
+                                            className="flex items-center gap-1.5 cursor-pointer transition-colors"
+                                            style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                padding: 0,
+                                                fontSize: '0.8rem',
+                                                fontWeight: 600,
+                                                color: '#EFBF04',
+                                                textDecoration: 'underline',
+                                                textUnderlineOffset: '3px',
+                                                fontFamily: 'inherit',
+                                            }}
+                                        >
+                                            <Ruler className="w-3.5 h-3.5" strokeWidth={2.2} />
+                                            View Size Chart
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="flex gap-3 flex-wrap">
-                                    {product.sizes.map((sizeEntry) => {
-                                        const outOfStock = sizeEntry.stock === 0;
-                                        const isSelected = selectedSize === sizeEntry.size;
+                                    {sizes.map((size) => {
+                                        const status = selectedColor ? sizeStatus(product, selectedColor, size) : 'unavailable';
+                                        const disabled = status !== 'available';
+                                        const isSelected = selectedSize === size;
+                                        const tooltip =
+                                            status === 'unavailable' ? 'Not available in this color' :
+                                            status === 'sold-out' ? 'Out of stock' : '';
                                         return (
                                             <button
-                                                key={sizeEntry.size}
-                                                onClick={() => !outOfStock && setSelectedSize(sizeEntry.size)}
-                                                disabled={outOfStock}
+                                                key={size}
+                                                onClick={() => !disabled && setSelectedSize(size)}
+                                                disabled={disabled}
+                                                title={tooltip}
                                                 className="font-semibold transition-all duration-200"
                                                 style={{
                                                     width: '3rem', height: '3rem', borderRadius: '50%', fontSize: '0.85rem',
                                                     border: isSelected ? '2px solid #EFBF04' : '1.5px solid #d1d5db',
-                                                    backgroundColor: outOfStock ? '#f3f4f6' : isSelected ? '#EFBF04' : 'transparent',
-                                                    color: outOfStock ? '#9ca3af' : isSelected ? '#ffffff' : '#374151',
+                                                    backgroundColor: disabled ? '#f3f4f6' : isSelected ? '#EFBF04' : 'transparent',
+                                                    color: disabled ? '#9ca3af' : isSelected ? '#ffffff' : '#374151',
                                                     transform: isSelected ? 'scale(1.1)' : 'scale(1)',
-                                                    cursor: outOfStock ? 'not-allowed' : 'pointer',
-                                                    opacity: outOfStock ? 0.5 : 1,
-                                                    textDecoration: outOfStock ? 'line-through' : 'none',
+                                                    cursor: disabled ? 'not-allowed' : 'pointer',
+                                                    opacity: status === 'unavailable' ? 0.35 : status === 'sold-out' ? 0.55 : 1,
+                                                    textDecoration: status === 'sold-out' ? 'line-through' : 'none',
                                                 }}
                                             >
-                                                {sizeEntry.size}
+                                                {size}
                                             </button>
                                         );
                                     })}
@@ -320,14 +389,14 @@ const ProductDetailsPage = () => {
                         <div className="flex flex-col gap-3" style={{ marginBottom: '2rem' }}>
                             <button
                                 onClick={handleBuyNow}
-                                disabled={product.totalStock === 0}
+                                disabled={!isPurchasable}
                                 className="w-full font-bold uppercase tracking-wider text-white rounded-lg transition-all duration-200 cursor-pointer hover:shadow-lg active:scale-[0.98]"
                                 style={{
                                     padding: '1rem', fontSize: '0.9rem',
-                                    background: product.totalStock === 0 ? '#d1d5db' : 'linear-gradient(135deg, #EFBF04, #d4a904)',
+                                    background: !isPurchasable ? '#d1d5db' : 'linear-gradient(135deg, #EFBF04, #d4a904)',
                                     letterSpacing: '0.08em',
-                                    cursor: product.totalStock === 0 ? 'not-allowed' : 'pointer',
-                                    opacity: product.totalStock === 0 ? 0.6 : 1,
+                                    cursor: !isPurchasable ? 'not-allowed' : 'pointer',
+                                    opacity: !isPurchasable ? 0.6 : 1,
                                 }}
                             >
                                 Buy Now
@@ -335,8 +404,17 @@ const ProductDetailsPage = () => {
 
                             <button
                                 onClick={handleAddToCart}
+                                disabled={!isPurchasable}
                                 className="w-full font-bold uppercase tracking-wider rounded-lg transition-all duration-200 cursor-pointer hover:bg-gray-50 active:scale-[0.98]"
-                                style={{ padding: '1rem', fontSize: '0.9rem', border: '2px solid #1f2937', color: '#1f2937', backgroundColor: 'white', letterSpacing: '0.08em' }}
+                                style={{
+                                    padding: '1rem', fontSize: '0.9rem',
+                                    border: '2px solid #1f2937',
+                                    color: !isPurchasable ? '#9ca3af' : '#1f2937',
+                                    backgroundColor: 'white',
+                                    letterSpacing: '0.08em',
+                                    cursor: !isPurchasable ? 'not-allowed' : 'pointer',
+                                    opacity: !isPurchasable ? 0.6 : 1,
+                                }}
                             >
                                 Add to Cart
                             </button>
@@ -373,6 +451,18 @@ const ProductDetailsPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Related Products */}
+            <div className="max-w-7xl mx-auto">
+                <RelatedProducts currentProduct={product} />
+            </div>
+
+            {/* Size Chart Modal */}
+            <SizeChartModal
+                isOpen={sizeChartOpen}
+                onClose={() => setSizeChartOpen(false)}
+                chart={sizeChart}
+            />
         </div>
     );
 };

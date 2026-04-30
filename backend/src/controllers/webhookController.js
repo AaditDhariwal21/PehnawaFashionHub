@@ -3,6 +3,7 @@ import squareClient from "../services/squareClient.js";
 import Product from "../models/Products.js";
 import PendingOrder from "../models/PendingOrder.js";
 import Order from "../models/Order.js";
+import { findVariant } from "../utils/variants.js";
 
 const SIGNATURE_KEY = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY || "";
 const WEBHOOK_URL = process.env.SQUARE_WEBHOOK_URL || "";
@@ -109,7 +110,7 @@ export const handleSquareWebhook = async (req, res) => {
             return res.status(200).send("OK");
         }
 
-        /* ── 9. Resolve products ── */
+        /* ── 9. Resolve products + variants ── */
         const resolved = [];
         for (const ci of pending.cartItems) {
             const product = await Product.findById(ci.productId);
@@ -118,10 +119,18 @@ export const handleSquareWebhook = async (req, res) => {
                 return res.status(200).send("OK");
             }
 
+            const variant = findVariant(product, ci.color, ci.size);
+            if (!variant) {
+                console.error(`[Webhook] Variant ${ci.color}/${ci.size} not found for ${product.name}`);
+                return res.status(200).send("OK");
+            }
+
             resolved.push({
                 product,
                 qty: ci.quantity,
+                price: variant.price,
                 image: ci.image,
+                color: ci.color || "",
                 size: ci.size || "",
             });
         }
@@ -131,46 +140,36 @@ export const handleSquareWebhook = async (req, res) => {
         let stockFailed = false;
 
         for (const r of resolved) {
-            let result;
-
-            if (r.product.sizes && r.product.sizes.length > 0 && r.size) {
-                result = await Product.updateOne(
-                    {
-                        _id: r.product._id,
-                        sizes: { $elemMatch: { size: r.size, stock: { $gte: r.qty } } },
+            const result = await Product.updateOne(
+                {
+                    _id: r.product._id,
+                    variants: {
+                        $elemMatch: {
+                            color: r.color,
+                            size: r.size,
+                            stock: { $gte: r.qty },
+                        },
                     },
-                    { $inc: { "sizes.$.stock": -r.qty, totalStock: -r.qty } }
-                );
-            } else if (r.product.totalStock != null) {
-                result = await Product.updateOne(
-                    { _id: r.product._id, totalStock: { $gte: r.qty } },
-                    { $inc: { totalStock: -r.qty } }
-                );
-            } else {
-                continue;
-            }
+                },
+                { $inc: { "variants.$.stock": -r.qty } }
+            );
 
             if (result.modifiedCount === 0) {
-                console.error(`[Webhook] Stock race condition for "${r.product.name}" (${r.size || "no size"}).`);
-                /* Rollback already-deducted items */
+                console.error(`[Webhook] Stock race condition for "${r.product.name}" (${r.color} / ${r.size}).`);
                 for (const d of deducted) {
-                    if (d.size) {
-                        await Product.updateOne(
-                            { _id: d.productId, "sizes.size": d.size },
-                            { $inc: { "sizes.$.stock": d.qty, totalStock: d.qty } }
-                        );
-                    } else {
-                        await Product.updateOne(
-                            { _id: d.productId },
-                            { $inc: { totalStock: d.qty } }
-                        );
-                    }
+                    await Product.updateOne(
+                        {
+                            _id: d.productId,
+                            variants: { $elemMatch: { color: d.color, size: d.size } },
+                        },
+                        { $inc: { "variants.$.stock": d.qty } }
+                    );
                 }
                 stockFailed = true;
                 break;
             }
 
-            deducted.push({ productId: r.product._id, size: r.size, qty: r.qty });
+            deducted.push({ productId: r.product._id, color: r.color, size: r.size, qty: r.qty });
         }
 
         if (stockFailed) {
@@ -183,8 +182,9 @@ export const handleSquareWebhook = async (req, res) => {
             productId: r.product._id,
             name: r.product.name,
             image: r.image,
+            color: r.color,
             size: r.size,
-            price: r.product.price,
+            price: r.price,
             quantity: r.qty,
         }));
 

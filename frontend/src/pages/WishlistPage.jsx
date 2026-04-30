@@ -6,7 +6,7 @@ import Footer from '../components/Footer';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
 import formatPrice from '../utils/formatPrice';
-import { getEffectivePrice, shouldShowDiscount } from '../utils/getEffectivePrice';
+import { findVariant, startingPrice, displayPrice, hasDiscount, defaultColor, totalStock as variantTotalStock } from '../utils/variants.js';
 import { getDisplayImages } from '../utils/getDisplayImages';
 
 const API = import.meta.env.VITE_API_URL;
@@ -59,19 +59,34 @@ const WishlistPage = () => {
 
     const handleAddToCart = (product) => {
         const wishItem = getWishlistItem(product._id);
-        const color = wishItem?.color || '';
-        const size = wishItem?.size || product.sizes?.find((s) => s.stock > 0)?.size || '';
-        const effectivePrice = getEffectivePrice(product, size);
-        const images = getDisplayImages(product, color);
+        // Prefer the saved (color, size). Otherwise navigate the user to the
+        // product page so they can pick a variant explicitly.
+        const savedColor = wishItem?.color || '';
+        const savedSize = wishItem?.size || '';
+        let variant = savedColor && savedSize ? findVariant(product, savedColor, savedSize) : null;
+
+        if (!variant || variant.stock === 0) {
+            // Pick the first in-stock variant on the saved/default color, if any.
+            const color = savedColor || defaultColor(product);
+            variant = (product.variants || []).find((v) => v.color === color && v.stock > 0)
+                   || (product.variants || []).find((v) => v.stock > 0);
+        }
+
+        if (!variant) {
+            navigate(`/product/${product._id}`);
+            return;
+        }
+
+        const images = getDisplayImages(product, variant.color);
         const image = images[0]?.url || product.images?.[0]?.url || '';
 
         addToCart({
             productId: product._id,
             name: product.name,
-            price: effectivePrice,
+            price: variant.price,
             image,
-            size,
-            color,
+            size: variant.size,
+            color: variant.color,
             quantity: 1,
         });
         openCart();
@@ -183,8 +198,13 @@ const WishlistPage = () => {
                                 const savedSize = wishItem?.size || '';
                                 const images = getDisplayImages(product, savedColor);
                                 const imageUrl = images[0]?.url || product.images?.[0]?.url;
-                                const effectivePrice = getEffectivePrice(product, savedSize);
-                                const showDiscount = shouldShowDiscount(product, savedSize);
+                                const effectivePrice = savedColor && savedSize
+                                    ? displayPrice(product, savedColor, savedSize)
+                                    : startingPrice(product);
+                                const showDiscount = savedColor && savedSize
+                                    ? hasDiscount(product, savedColor, savedSize)
+                                    : effectivePrice < (product.price || 0);
+                                const outOfStock = variantTotalStock(product) === 0;
                                 const isRemoving = removingId === product._id;
 
                                 return (
@@ -305,19 +325,19 @@ const WishlistPage = () => {
                                             {/* Add to Bag */}
                                             <button
                                                 onClick={() => handleAddToCart(product)}
-                                                disabled={product.totalStock === 0}
+                                                disabled={outOfStock}
                                                 className="w-full flex items-center justify-center gap-2 font-semibold rounded-lg cursor-pointer border-none transition-all active:scale-[0.98]"
                                                 style={{
                                                     marginTop: '0.85rem',
                                                     padding: '0.65rem 1rem',
                                                     fontSize: '0.85rem',
-                                                    backgroundColor: product.totalStock === 0 ? '#f3f4f6' : '#1f2937',
-                                                    color: product.totalStock === 0 ? '#9ca3af' : '#fff',
-                                                    cursor: product.totalStock === 0 ? 'not-allowed' : 'pointer',
+                                                    backgroundColor: outOfStock ? '#f3f4f6' : '#1f2937',
+                                                    color: outOfStock ? '#9ca3af' : '#fff',
+                                                    cursor: outOfStock ? 'not-allowed' : 'pointer',
                                                 }}
                                             >
                                                 <ShoppingBag className="w-4 h-4" strokeWidth={2} />
-                                                {product.totalStock === 0 ? 'Out of Stock' : 'Add to Bag'}
+                                                {outOfStock ? 'Out of Stock' : 'Add to Bag'}
                                             </button>
                                         </div>
                                     </div>

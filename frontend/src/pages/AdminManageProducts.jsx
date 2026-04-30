@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Plus, Trash2, Upload } from 'lucide-react';
+import { X } from 'lucide-react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { useAuth } from '../context/AuthContext';
 import formatPrice from '../utils/formatPrice';
+import VariantMatrix from '../components/VariantMatrix';
+import ColorImagesManager, { finalizeColors } from '../components/ColorImagesManager';
+import { buildVariantMatrix, totalStock as variantTotalStock } from '../utils/variants.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-const PRESET_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
 const categories = ['Anarkalis', 'Coord Sets', 'Lehangas', 'Indo Western', 'Suits & Kurtis', 'Sarees', 'Blouses', 'Kidswear', "Men's Kurta", 'Dupattas', 'Pashminas'];
 const specialTags = ['', 'New Arrival', 'Best Seller', 'Sale', 'Trending'];
 
@@ -23,123 +25,203 @@ const quillModules = {
 const quillFormats = ['bold', 'italic', 'underline', 'list', 'link'];
 
 /* ═══════════════════════════════ Edit Modal ═══════════════════════════════ */
+//
+// IMPORTANT: this component is mounted with `key={product._id}` from the
+// parent, so it remounts cleanly when switching products. That means we
+// can initialise state directly from `product` props without worrying
+// about stale state leaking between sessions.
 const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
-    const [formData, setFormData] = useState({ name: '', shortDescription: '', description: '', price: '', sellingPrice: '', category: '', specialTag: '', weight: '', isCategoryCover: false });
-    const [sizes, setSizes] = useState([]);
-    const [customSize, setCustomSize] = useState('');
-    const [existingImages, setExistingImages] = useState([]);
-    const [newFiles, setNewFiles] = useState([]);
-    const [newPreviews, setNewPreviews] = useState([]);
-    const [existingColors, setExistingColors] = useState([]); // [{colorName, images:[{url,publicId}]}]
-    const [newColorFiles, setNewColorFiles] = useState({}); // {colorName: File[]}
-    const [newColorPreviews, setNewColorPreviews] = useState({}); // {colorName: string[]}
-    const [newColorName, setNewColorName] = useState('');
-    const [activeColorTab, setActiveColorTab] = useState(null);
+    /* ── Form fields, initialised straight from `product` ── */
+    const [formData, setFormData] = useState(() => ({
+        name: product.name || '',
+        shortDescription: product.shortDescription || '',
+        description: product.description || '',
+        price: product.price ?? '',
+        category: product.category || '',
+        specialTag: product.specialTag || '',
+        weight: product.weight ?? '',
+        isCategoryCover: !!product.isCategoryCover,
+    }));
+
+    /* ── Color/image state in the unified ColorImagesManager shape ── */
+    const [colors, setColors] = useState(() =>
+        (product.colors || []).map((c) => ({
+            colorName: c.colorName,
+            images: (c.images || []).map((img) => ({
+                kind: 'existing',
+                url: img.url,
+                publicId: img.publicId,
+            })),
+        }))
+    );
+
+    /* ── Variant matrix, hydrated from `product.variants` ── */
+    const [variants, setVariants] = useState(() =>
+        (product.variants || []).map((v) => ({
+            color: v.color,
+            size: v.size,
+            price: v.price,
+            stock: v.stock,
+        }))
+    );
+    const [sizes, setSizes] = useState(() => {
+        const seen = new Set();
+        const out = [];
+        for (const v of product.variants || []) {
+            if (!seen.has(v.size)) { seen.add(v.size); out.push(v.size); }
+        }
+        return out;
+    });
+
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const totalStock = sizes.reduce((sum, s) => sum + (Number(s.stock) || 0), 0);
-
+    /* Resolve "is category cover" — the product flag may be stale if
+       another product in the same category has been promoted. */
     useEffect(() => {
-        if (!product) return;
-        const initForm = async () => {
-            let isActiveCover = product.isCategoryCover || false;
-            if (!isActiveCover && product.category) {
-                try {
-                    const res = await fetch(`${API_BASE_URL}/products/categories/covers`);
-                    const data = await res.json();
-                    if (data.success && data.covers[product.category]?.productId === product._id) isActiveCover = true;
-                } catch { /* silent */ }
-            }
-            setFormData({
-                name: product.name || '', shortDescription: product.shortDescription || '', description: product.description || '',
-                price: product.price ?? '', sellingPrice: product.sellingPrice ?? '',
-                category: product.category || '', specialTag: product.specialTag || '', weight: product.weight ?? '',
-                isCategoryCover: isActiveCover,
-            });
-        };
-        initForm();
-        setSizes(product.sizes?.length ? product.sizes.map(s => ({ size: s.size, stock: s.stock, price: s.price ?? '' })) : []);
-        setExistingImages(product.images || []);
-        setExistingColors(product.colors || []);
-        setNewFiles([]); setNewPreviews([]); setNewColorFiles({}); setNewColorPreviews({});
-        setActiveColorTab(null); setError('');
-    }, [product]);
+        if (product.isCategoryCover || !product.category) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/products/categories/covers`);
+                const data = await res.json();
+                if (cancelled || !data.success) return;
+                if (data.covers[product.category]?.productId === product._id) {
+                    setFormData((p) => ({ ...p, isCategoryCover: true }));
+                }
+            } catch { /* silent */ }
+        })();
+        return () => { cancelled = true; };
+    }, [product._id, product.category, product.isCategoryCover]);
 
-    if (!product) return null;
     const token = localStorage.getItem('token');
 
-    const handleInputChange = (e) => { const { name, value } = e.target; setFormData(p => ({ ...p, [name]: value })); };
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData((p) => ({ ...p, [name]: value }));
+    };
 
-    /* Size helpers */
-    const addSize = (n) => { if (!n.trim() || sizes.some(s => s.size === n.trim())) return; setSizes(p => [...p, { size: n.trim(), stock: 0, price: '' }]); };
-    const removeSize = (i) => setSizes(p => p.filter((_, j) => j !== i));
-    const updateSize = (i, f, v) => setSizes(p => p.map((s, j) => j === i ? { ...s, [f]: v } : s));
+    /* ── Sync the variant matrix when the color list changes ── */
+    const handleColorsChange = (nextColors) => {
+        setColors(nextColors);
+        const colorNames = nextColors.map((c) => c.colorName);
+        setVariants((current) => buildVariantMatrix(colorNames, sizes, current));
+    };
 
-    /* General image helpers */
-    const removeExistingImage = (i) => setExistingImages(p => p.filter((_, j) => j !== i));
-    const handleNewImages = (e) => { const f = Array.from(e.target.files); setNewFiles(p => [...p, ...f]); setNewPreviews(p => [...p, ...f.map(x => URL.createObjectURL(x))]); };
-    const removeNewImage = (i) => { setNewFiles(p => p.filter((_, j) => j !== i)); setNewPreviews(p => p.filter((_, j) => j !== i)); };
+    const handleMatrixChange = (nextSizes, nextVariants) => {
+        setSizes(nextSizes);
+        setVariants(nextVariants);
+    };
 
-    /* Color helpers */
-    const addColor = () => { const n = newColorName.trim(); if (!n || existingColors.some(c => c.colorName === n)) return; setExistingColors(p => [...p, { colorName: n, images: [] }]); setActiveColorTab(n); setNewColorName(''); };
-    const removeColor = (name) => { setExistingColors(p => p.filter(c => c.colorName !== name)); if (activeColorTab === name) setActiveColorTab(null); const nf = { ...newColorFiles }; delete nf[name]; setNewColorFiles(nf); const np = { ...newColorPreviews }; delete np[name]; setNewColorPreviews(np); };
-    const removeExistingColorImage = (colorName, imgIdx) => { setExistingColors(p => p.map(c => c.colorName === colorName ? { ...c, images: c.images.filter((_, j) => j !== imgIdx) } : c)); };
-    const handleColorImageUpload = (colorName, e) => { const f = Array.from(e.target.files); setNewColorFiles(p => ({ ...p, [colorName]: [...(p[colorName] || []), ...f] })); setNewColorPreviews(p => ({ ...p, [colorName]: [...(p[colorName] || []), ...f.map(x => URL.createObjectURL(x))] })); };
-    const removeNewColorImage = (colorName, i) => { setNewColorFiles(p => ({ ...p, [colorName]: (p[colorName] || []).filter((_, j) => j !== i) })); setNewColorPreviews(p => ({ ...p, [colorName]: (p[colorName] || []).filter((_, j) => j !== i) })); };
-
-    /* Upload helper */
+    /* ── Cloudinary upload helper ── */
     const uploadFiles = async (files) => {
         if (!files.length) return [];
-        const fd = new FormData(); files.forEach(f => fd.append('images', f));
-        const res = await fetch(`${API_BASE_URL}/adminDashboard/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd });
+        const fd = new FormData();
+        files.forEach((f) => fd.append('images', f));
+        const res = await fetch(`${API_BASE_URL}/adminDashboard/upload`, {
+            method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Upload failed');
-        return data.images.map(img => ({ url: img.url, publicId: img.public_id }));
+        return data.images.map((img) => ({ url: img.url, publicId: img.public_id }));
     };
 
-    /* Save */
+    /* ── Save ── */
     const handleSave = async () => {
-        setError(''); setIsLoading(true);
+        setError('');
+        setIsLoading(true);
         try {
-            if (formData.sellingPrice && Number(formData.sellingPrice) >= Number(formData.price)) { setError('Selling price must be less than MRP.'); setIsLoading(false); return; }
-            const uploadedGeneral = await uploadFiles(newFiles);
-            // Per-color uploads
-            const finalColors = [];
-            for (const c of existingColors) {
-                const newImgs = await uploadFiles(newColorFiles[c.colorName] || []);
-                finalColors.push({ colorName: c.colorName, images: [...c.images, ...newImgs] });
+            if (colors.length === 0) {
+                setError('Add at least one color.'); setIsLoading(false); return;
             }
-            const cleanSizes = sizes.map(s => ({ size: s.size, stock: Math.max(0, Number(s.stock) || 0), ...(s.price !== '' && s.price != null ? { price: Number(s.price) } : {}) }));
+            if (colors[0].images.length === 0) {
+                setError(`"${colors[0].colorName}" needs at least one image (used as the card thumbnail).`);
+                setIsLoading(false); return;
+            }
+            if (variants.length === 0) {
+                setError('Add at least one variant.'); setIsLoading(false); return;
+            }
+            for (const v of variants) {
+                const price = Number(v.price);
+                const stock = Number(v.stock);
+                if (!Number.isFinite(price) || price <= 0) {
+                    setError(`Set a valid price for ${v.color} / ${v.size}.`); setIsLoading(false); return;
+                }
+                if (!Number.isFinite(stock) || stock < 0) {
+                    setError(`Set a valid stock for ${v.color} / ${v.size}.`); setIsLoading(false); return;
+                }
+            }
+
+            const finalColors = await finalizeColors(colors, uploadFiles);
+
+            const cleanVariants = variants.map((v) => ({
+                color: v.color,
+                size: v.size,
+                price: Number(v.price),
+                stock: Math.max(0, Number(v.stock) || 0),
+            }));
+
             const body = {
-                name: formData.name, shortDescription: formData.shortDescription, description: formData.description,
-                price: Number(formData.price), sellingPrice: formData.sellingPrice ? Number(formData.sellingPrice) : null,
-                category: formData.category, sizes: cleanSizes, totalStock,
-                weight: Number(formData.weight) || 0, specialTag: formData.specialTag || null, isCategoryCover: formData.isCategoryCover,
-                images: [...existingImages, ...uploadedGeneral], colors: finalColors,
+                name: formData.name,
+                shortDescription: formData.shortDescription,
+                description: formData.description,
+                price: Number(formData.price),
+                category: formData.category,
+                weight: Number(formData.weight) || 0,
+                specialTag: formData.specialTag || null,
+                isCategoryCover: formData.isCategoryCover,
+                images: finalColors[0].images,
+                colors: finalColors,
+                variants: cleanVariants,
             };
-            const res = await fetch(`${API_BASE_URL}/products/${product._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+
+            const res = await fetch(`${API_BASE_URL}/products/${product._id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(body),
+            });
             const data = await res.json();
-            if (!res.ok) { setError(data.message || 'Failed to update.'); setIsLoading(false); return; }
+
+            if (!res.ok || !data.success) {
+                setError(data.message || 'Failed to update.');
+                setIsLoading(false);
+                return;
+            }
             onSaved(data.product);
-        } catch (err) { console.error(err); setError(err.message || 'Network error.'); } finally { setIsLoading(false); }
+        } catch (err) {
+            console.error(err);
+            setError(err.message || 'Network error.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    /* Delete */
+    /* ── Delete ── */
     const handleDelete = async () => {
         if (!window.confirm(`Delete "${product.name}"? This cannot be undone.`)) return;
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/products/${product._id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-            if (!res.ok) { const d = await res.json(); setError(d.message || 'Failed to delete.'); setIsLoading(false); return; }
+            const res = await fetch(`${API_BASE_URL}/products/${product._id}`, {
+                method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) {
+                const d = await res.json();
+                setError(d.message || 'Failed to delete.');
+                setIsLoading(false);
+                return;
+            }
             onDeleted(product._id);
-        } catch (err) { console.error(err); setError('Network error.'); } finally { setIsLoading(false); }
+        } catch (err) {
+            console.error(err);
+            setError('Network error.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const inputCls = 'w-full text-sm border border-gray-200 rounded-lg text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all';
     const inputPad = { padding: '10px 14px' };
     const labelCls = 'block text-xs font-medium text-gray-500 mb-1.5';
-    const activeColorEntry = existingColors.find(c => c.colorName === activeColorTab);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)' }} onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -150,72 +232,14 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
                     <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all cursor-pointer"><X className="w-5 h-5" /></button>
                 </div>
 
-                {/* Body — 2-column */}
+                {/* Body */}
                 <div className="flex-1 overflow-y-auto" style={{ padding: '24px 28px' }}>
                     {error && <div className="bg-red-50 border border-red-200 rounded-lg mb-5" style={{ padding: '10px 16px' }}><p className="text-red-600 text-sm">{error}</p></div>}
 
                     <div className="flex flex-col lg:flex-row gap-8">
-                        {/* LEFT — Images */}
+                        {/* LEFT — Color × Image manager */}
                         <div className="w-full lg:w-[42%] flex-shrink-0">
-                            {/* General images */}
-                            <div className="mb-6">
-                                <p className="text-sm font-semibold text-gray-700 mb-3">Product Images</p>
-                                {existingImages.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 mb-3">
-                                        {existingImages.map((img, i) => (
-                                            <div key={i} className="relative">
-                                                <img src={img.url} alt="" className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
-                                                <button type="button" onClick={() => removeExistingImage(i)} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[0.55rem] cursor-pointer">x</button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                <div className="border-2 border-dashed border-gray-200 rounded-xl text-center hover:border-amber-400 transition-colors cursor-pointer bg-gray-50/50 hover:bg-amber-50/30" style={{ padding: '20px 16px' }} onClick={() => document.getElementById('edit-gen-upload').click()}>
-                                    <input id="edit-gen-upload" type="file" accept="image/*" multiple onChange={handleNewImages} className="hidden" />
-                                    <Upload className="w-5 h-5 mx-auto text-gray-300 mb-1" />
-                                    <p className="text-xs text-gray-500">Upload images</p>
-                                </div>
-                                {newPreviews.length > 0 && <div className="flex flex-wrap gap-2 mt-3">{newPreviews.map((p, i) => (<div key={i} className="relative"><img src={p} alt="" className="w-14 h-14 object-cover rounded-lg border border-gray-200" /><button type="button" onClick={() => removeNewImage(i)} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[0.55rem] cursor-pointer">x</button></div>))}</div>}
-                            </div>
-
-                            {/* Color Variants */}
-                            <div>
-                                <p className="text-sm font-semibold text-gray-700 mb-3">Color Variants</p>
-                                <div className="flex gap-2 mb-3">
-                                    <input type="text" value={newColorName} onChange={(e) => setNewColorName(e.target.value)} placeholder="e.g. Red" className={`flex-1 ${inputCls}`} style={{ padding: '8px 12px', fontSize: '0.8rem' }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addColor(); } }} />
-                                    <button type="button" onClick={addColor} className="text-xs font-semibold rounded-lg text-white cursor-pointer hover:opacity-90" style={{ padding: '8px 14px', backgroundColor: '#EFBF04' }}><Plus className="w-3.5 h-3.5 inline -mt-0.5" /> Add</button>
-                                </div>
-                                {existingColors.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 mb-3">
-                                        {existingColors.map(c => (
-                                            <div key={c.colorName} className="flex items-center gap-1.5 rounded-full cursor-pointer transition-all text-xs font-semibold" style={{ padding: '5px 12px', border: activeColorTab === c.colorName ? '2px solid #EFBF04' : '1.5px solid #e5e7eb', backgroundColor: activeColorTab === c.colorName ? '#fffbeb' : '#fff' }} onClick={() => setActiveColorTab(c.colorName)}>
-                                                <span className="text-gray-700">{c.colorName}</span>
-                                                <span className="text-gray-400 text-[0.65rem]">({c.images.length + (newColorFiles[c.colorName]?.length || 0)})</span>
-                                                <button type="button" onClick={(e) => { e.stopPropagation(); removeColor(c.colorName); }} className="text-gray-300 hover:text-red-500 ml-0.5 cursor-pointer"><X className="w-3 h-3" /></button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                {activeColorEntry && (
-                                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                        <p className="text-xs font-semibold text-gray-600 mb-2">Images for "{activeColorTab}"</p>
-                                        {activeColorEntry.images.length > 0 && (
-                                            <div className="flex flex-wrap gap-2 mb-2">
-                                                {activeColorEntry.images.map((img, j) => (
-                                                    <div key={j} className="relative"><img src={img.url} alt="" className="w-12 h-12 object-cover rounded-lg border border-gray-200" /><button type="button" onClick={() => removeExistingColorImage(activeColorTab, j)} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[0.55rem] cursor-pointer">x</button></div>
-                                                ))}
-                                            </div>
-                                        )}
-                                        <div className="border-2 border-dashed border-gray-200 rounded-lg text-center cursor-pointer hover:border-amber-400" style={{ padding: '14px 10px' }} onClick={() => document.getElementById(`edit-color-upload-${activeColorTab}`).click()}>
-                                            <input id={`edit-color-upload-${activeColorTab}`} type="file" accept="image/*" multiple onChange={(e) => handleColorImageUpload(activeColorTab, e)} className="hidden" />
-                                            <Upload className="w-4 h-4 mx-auto text-gray-300 mb-1" /><p className="text-xs text-gray-400">Upload</p>
-                                        </div>
-                                        {(newColorPreviews[activeColorTab] || []).length > 0 && (
-                                            <div className="flex flex-wrap gap-2 mt-2">{newColorPreviews[activeColorTab].map((p, j) => (<div key={j} className="relative"><img src={p} alt="" className="w-12 h-12 object-cover rounded-lg border border-gray-200" /><button type="button" onClick={() => removeNewColorImage(activeColorTab, j)} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[0.55rem] cursor-pointer">x</button></div>))}</div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
+                            <ColorImagesManager colors={colors} onChange={handleColorsChange} />
                         </div>
 
                         {/* RIGHT — Data */}
@@ -237,50 +261,30 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className={labelCls}>MRP ($) *</label><input type="number" name="price" value={formData.price} onChange={handleInputChange} min="0" className={inputCls} style={inputPad} /></div>
-                                <div><label className={labelCls}>Selling Price ($)</label><input type="number" name="sellingPrice" value={formData.sellingPrice} onChange={handleInputChange} placeholder="Optional" min="0" className={inputCls} style={inputPad} /></div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className={labelCls}>MRP ($) *</label>
+                                    <input type="number" name="price" value={formData.price} onChange={handleInputChange} min="0" className={inputCls} style={inputPad} />
+                                    <p className="text-[0.65rem] text-gray-400" style={{ marginTop: '0.25rem' }}>List price — used as the strikethrough on cards.</p>
+                                </div>
                                 <div><label className={labelCls}>Weight (lbs) *</label><input type="number" name="weight" value={formData.weight} onChange={handleInputChange} min="0.01" step="0.01" className={inputCls} style={inputPad} /></div>
-                                <div><label className={labelCls}>Category *</label><select name="category" value={formData.category} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}><option value="">Select</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
+                                <div><label className={labelCls}>Category *</label><select name="category" value={formData.category} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}><option value="">Select</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                                 <div><label className={labelCls}>Special Tag</label><select name="specialTag" value={formData.specialTag} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}><option value="">None</option>{specialTags.filter(Boolean).map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                                {formData.category && <div className="flex items-end pb-1"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formData.isCategoryCover} onChange={(e) => setFormData(p => ({ ...p, isCategoryCover: e.target.checked }))} className="w-4 h-4 rounded cursor-pointer accent-amber-500" /><span className="text-xs text-gray-600">Category cover</span></label></div>}
                             </div>
+                            {formData.category && (
+                                <label className="flex items-center gap-2 cursor-pointer" style={{ marginTop: '-0.5rem' }}>
+                                    <input type="checkbox" checked={formData.isCategoryCover} onChange={(e) => setFormData(p => ({ ...p, isCategoryCover: e.target.checked }))} className="w-4 h-4 rounded cursor-pointer accent-amber-500" />
+                                    <span className="text-xs text-gray-600">Use as category cover</span>
+                                </label>
+                            )}
 
-                            {/* Size & Pricing */}
-                            <div className="bg-gray-50 border border-gray-200 rounded-xl" style={{ padding: '1.25rem 1.5rem' }}>
-                                <div className="flex items-center justify-between" style={{ marginBottom: '1.25rem' }}>
-                                    <p className="text-sm font-semibold text-gray-700">Size & Pricing</p>
-                                    <span className="text-xs font-bold rounded-full" style={{ padding: '4px 12px', backgroundColor: totalStock > 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.08)', color: totalStock > 0 ? '#16a34a' : '#dc2626' }}>Total: {totalStock}</span>
-                                </div>
-                                <div className="flex flex-wrap" style={{ gap: '0.6rem', marginBottom: '1rem' }}>
-                                    {PRESET_SIZES.map(s => { const added = sizes.some(sz => sz.size === s); return (<button key={s} type="button" onClick={() => addSize(s)} disabled={added} className="text-xs font-semibold rounded-full border-[1.5px] transition-all" style={{ padding: '7px 18px', borderColor: added ? '#d1d5db' : '#EFBF04', color: added ? '#9ca3af' : '#EFBF04', backgroundColor: added ? '#f3f4f6' : 'transparent', cursor: added ? 'default' : 'pointer' }}>{added ? `${s} ✓` : `+ ${s}`}</button>); })}
-                                </div>
-                                <div className="flex" style={{ gap: '0.5rem', marginBottom: '1.25rem' }}>
-                                    <input type="text" value={customSize} onChange={(e) => setCustomSize(e.target.value)} placeholder="Custom size (e.g. Free Size)" className={`flex-1 ${inputCls}`} style={{ padding: '9px 14px', fontSize: '0.8rem' }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSize(customSize); setCustomSize(''); } }} />
-                                    <button type="button" onClick={() => { addSize(customSize); setCustomSize(''); }} className="text-xs font-semibold rounded-lg text-white cursor-pointer hover:opacity-90" style={{ padding: '9px 20px', backgroundColor: '#EFBF04' }}>Add</button>
-                                </div>
-                                {sizes.length > 0 ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                                        {sizes.map((s, i) => (
-                                            <div key={s.size} className="flex items-center bg-white rounded-xl shadow-sm" style={{ padding: '0.75rem 1rem', border: '1px solid #e5e7eb', gap: '1rem' }}>
-                                                <span className="text-sm font-bold text-gray-800 bg-gray-100 rounded-lg text-center flex-shrink-0" style={{ padding: '0.3rem 0', width: '3rem' }}>{s.size}</span>
-                                                <div className="flex flex-col flex-1 min-w-0">
-                                                    <span className="text-[0.6rem] text-gray-400 font-semibold uppercase mb-0.5">Stock</span>
-                                                    <input type="number" value={s.stock} onChange={(e) => updateSize(i, 'stock', Math.max(0, Number(e.target.value) || 0))} min="0" className="text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400" style={{ padding: '6px 10px', width: '100%' }} />
-                                                </div>
-                                                <div className="flex flex-col flex-1 min-w-0">
-                                                    <span className="text-[0.6rem] text-gray-400 font-semibold uppercase mb-0.5">Price ($)</span>
-                                                    <input type="number" value={s.price} onChange={(e) => updateSize(i, 'price', e.target.value)} placeholder="—" min="0" className="text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400" style={{ padding: '6px 10px', width: '100%' }} />
-                                                </div>
-                                                <button type="button" onClick={() => removeSize(i)} className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : <div className="text-center" style={{ padding: '1.5rem 0' }}><p className="text-xs text-gray-400">Click a size above or add a custom size to get started.</p></div>}
-                            </div>
+                            <VariantMatrix
+                                colors={colors.map((c) => c.colorName)}
+                                sizes={sizes}
+                                variants={variants}
+                                onChange={handleMatrixChange}
+                            />
                         </div>
                     </div>
                 </div>
@@ -354,14 +358,14 @@ const AdminManageProducts = () => {
     };
 
     /* ── Filtered products ── */
-    const filtered = products.filter(p => {
+    const filtered = useMemo(() => products.filter(p => {
         if (categoryFilter && p.category !== categoryFilter) return false;
         if (searchQuery) {
             const q = searchQuery.toLowerCase();
             if (!p.name.toLowerCase().includes(q)) return false;
         }
         return true;
-    });
+    }), [products, categoryFilter, searchQuery]);
 
     /* ── Selection helpers ── */
     const toggleSelect = (id) => {
@@ -451,7 +455,6 @@ const AdminManageProducts = () => {
 
                 {/* ── Filters & Bulk Actions Bar ── */}
                 <div className="flex flex-wrap items-center gap-3 mb-5">
-                    {/* Search */}
                     <input
                         type="text"
                         value={searchQuery}
@@ -460,7 +463,6 @@ const AdminManageProducts = () => {
                         className="text-sm border border-gray-200 rounded-md text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
                         style={{ padding: '9px 14px', width: '220px' }}
                     />
-                    {/* Category filter */}
                     <select
                         value={categoryFilter}
                         onChange={(e) => setCategoryFilter(e.target.value)}
@@ -473,7 +475,6 @@ const AdminManageProducts = () => {
 
                     <div className="flex-1" />
 
-                    {/* Bulk actions */}
                     {selectedIds.size > 0 && (
                         <div className="flex items-center gap-3">
                             <span className="text-sm text-gray-500 font-medium">{selectedIds.size} selected</span>
@@ -522,11 +523,13 @@ const AdminManageProducts = () => {
 
                         {filtered.map((product, index) => {
                             const thumb = product.images?.[0]?.url;
-                            const stock = product.totalStock ?? 0;
+                            // Compute total locally from variants — do not trust any
+                            // stale totalStock that may exist on the document.
+                            const stock = variantTotalStock(product);
                             const inStock = stock > 0;
                             const isSelected = selectedIds.has(product._id);
-                            const sizeBreakdown = product.sizes && product.sizes.length > 0
-                                ? product.sizes.map(s => `${s.size}: ${s.stock}`).join(', ')
+                            const breakdown = (product.variants && product.variants.length > 0)
+                                ? product.variants.map(v => `${v.color}/${v.size}: ${v.stock}`).join(', ')
                                 : null;
 
                             return (
@@ -541,7 +544,6 @@ const AdminManageProducts = () => {
                                         backgroundColor: isSelected ? 'rgba(239,191,4,0.06)' : 'transparent',
                                     }}
                                 >
-                                    {/* Checkbox */}
                                     <span className="flex items-center justify-center">
                                         <input
                                             type="checkbox"
@@ -552,7 +554,6 @@ const AdminManageProducts = () => {
                                         />
                                     </span>
 
-                                    {/* Thumbnail */}
                                     <div className="w-11 h-11 rounded-md overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center cursor-pointer" onClick={() => setEditProduct(product)}>
                                         {thumb ? (
                                             <img src={thumb} alt={product.name} className="w-full h-full object-cover" />
@@ -563,26 +564,21 @@ const AdminManageProducts = () => {
                                         )}
                                     </div>
 
-                                    {/* Name */}
                                     <p className="text-sm font-medium text-gray-900 truncate cursor-pointer mt-2 md:mt-0" onClick={() => setEditProduct(product)}>{product.name}</p>
 
-                                    {/* Category */}
                                     <span className="text-xs text-gray-500 md:text-sm">{product.category}</span>
 
-                                    {/* Price */}
                                     <span className="text-sm font-semibold text-gray-800 md:text-right">{formatPrice(product.price)}</span>
 
-                                    {/* Stock with tooltip */}
-                                    <span className="text-sm text-gray-600 md:text-center relative group" title={sizeBreakdown || ''}>
+                                    <span className="text-sm text-gray-600 md:text-center relative group" title={breakdown || ''}>
                                         {stock}
-                                        {sizeBreakdown && (
+                                        {breakdown && (
                                             <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs text-white bg-gray-800 rounded whitespace-nowrap z-10">
-                                                {sizeBreakdown}
+                                                {breakdown}
                                             </span>
                                         )}
                                     </span>
 
-                                    {/* Status badge */}
                                     <div className="md:flex md:justify-center">
                                         <span className="inline-block text-xs font-medium rounded-full"
                                             style={{ padding: '3px 10px', backgroundColor: inStock ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: inStock ? '#16a34a' : '#dc2626' }}>
@@ -596,13 +592,17 @@ const AdminManageProducts = () => {
                 )}
             </main>
 
-            {/* Edit Modal */}
-            <ProductEditModal
-                product={editProduct}
-                onClose={() => setEditProduct(null)}
-                onSaved={handleSaved}
-                onDeleted={handleDeleted}
-            />
+            {/* Edit Modal — `key` forces a fresh mount per product so state
+                always initialises from the latest server snapshot. */}
+            {editProduct && (
+                <ProductEditModal
+                    key={editProduct._id}
+                    product={editProduct}
+                    onClose={() => setEditProduct(null)}
+                    onSaved={handleSaved}
+                    onDeleted={handleDeleted}
+                />
+            )}
         </div>
     );
 };

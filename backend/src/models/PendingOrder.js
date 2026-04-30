@@ -25,6 +25,7 @@ const pendingOrderSchema = new mongoose.Schema(
                 productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
                 image: { type: String, default: "" },
                 size: { type: String, default: "" },
+                color: { type: String, default: "" },
                 quantity: { type: Number, required: true, min: 1 },
             },
         ],
