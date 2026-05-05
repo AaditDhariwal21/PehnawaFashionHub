@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 
 import './SearchOverlay.css';
+import { productUrl } from '../utils/productUrl.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -98,9 +99,9 @@ const SearchOverlay = ({ isOpen, onClose }) => {
         if (e.target === e.currentTarget) onClose();
     };
 
-    const goToProduct = (id) => {
+    const goToProduct = (product) => {
         onClose();
-        navigate(`/product/${id}`);
+        navigate(productUrl(product));
     };
 
     if (!isOpen) return null;
@@ -143,7 +144,7 @@ const SearchOverlay = ({ isOpen, onClose }) => {
                                     <div
                                         key={product._id}
                                         className="search-overlay__dropdown-item"
-                                        onClick={() => goToProduct(product._id)}
+                                        onClick={() => goToProduct(product)}
                                     >
                                         <div className="search-overlay__dropdown-thumb">
                                             {product.images?.[0]?.url ? (

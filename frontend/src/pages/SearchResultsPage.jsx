@@ -6,6 +6,7 @@ import { useWishlist } from '../context/WishlistContext';
 import { useCompare } from '../context/CompareContext';
 import formatPrice from '../utils/formatPrice';
 import { startingPrice } from '../utils/variants.js';
+import { productUrl } from '../utils/productUrl.js';
 import './SearchResultsPage.css';
 
 const SearchResultsPage = () => {
@@ -133,7 +134,7 @@ const SearchResultsPage = () => {
                                 <div
                                     key={product._id}
                                     className="search-results__card"
-                                    onClick={() => navigate(`/product/${product._id}`)}
+                                    onClick={() => navigate(productUrl(product))}
                                 >
                                     {/* Image */}
                                     <div className="search-results__card-img-wrap">

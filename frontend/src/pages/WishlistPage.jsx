@@ -8,6 +8,7 @@ import { useCart } from '../context/CartContext';
 import formatPrice from '../utils/formatPrice';
 import { findVariant, startingPrice, displayPrice, hasDiscount, defaultColor, totalStock as variantTotalStock } from '../utils/variants.js';
 import { getDisplayImages } from '../utils/getDisplayImages';
+import { productUrl } from '../utils/productUrl.js';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -73,7 +74,7 @@ const WishlistPage = () => {
         }
 
         if (!variant) {
-            navigate(`/product/${product._id}`);
+            navigate(productUrl(product));
             return;
         }
 
@@ -225,7 +226,7 @@ const WishlistPage = () => {
                                         <div
                                             className="relative overflow-hidden cursor-pointer"
                                             style={{ aspectRatio: '3/4', backgroundColor: '#f8f8f8' }}
-                                            onClick={() => navigate(`/product/${product._id}`)}
+                                            onClick={() => navigate(productUrl(product))}
                                         >
                                             {imageUrl ? (
                                                 <img
@@ -283,7 +284,7 @@ const WishlistPage = () => {
                                             <h3
                                                 className="font-semibold text-gray-900 truncate cursor-pointer hover:text-gray-600 transition-colors"
                                                 style={{ fontSize: '0.95rem', lineHeight: 1.3 }}
-                                                onClick={() => navigate(`/product/${product._id}`)}
+                                                onClick={() => navigate(productUrl(product))}
                                             >
                                                 {product.name}
                                             </h3>

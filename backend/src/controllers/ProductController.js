@@ -20,7 +20,12 @@ export const getAllProducts = async (req, res) => {
     }
 };
 
-// Get single product by ID (Public - anyone can access)
+// Get single product by ID (Public).
+//
+// This endpoint is the legacy entry point. New URLs use slugs, but old
+// links using `/product/:id` still hit here. We return the product plus
+// `redirectTo` — the canonical slug URL — so the client can swap the
+// browser URL with `navigate(..., { replace: true })`.
 export const getProductById = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
@@ -32,12 +37,55 @@ export const getProductById = async (req, res) => {
             });
         }
 
+        const redirectTo = product.slug && product.categorySlug
+            ? `/product/${product.categorySlug}/${product.slug}`
+            : null;
+
         res.status(200).json({
             success: true,
             product,
+            redirectTo,
         });
     } catch (error) {
         console.error("Get Product By ID Error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error fetching product",
+            error: error.message,
+        });
+    }
+};
+
+// Get single product by slug (Public).
+//
+// Canonical lookup. `categorySlug` is validated against the product's
+// own categorySlug — if a user lands on a stale category URL after a
+// product has been recategorized, we 200 with `redirectTo` set to the
+// correct path instead of forcing a 404.
+export const getProductBySlug = async (req, res) => {
+    try {
+        const { categorySlug, productSlug } = req.params;
+
+        const product = await Product.findOne({ slug: productSlug });
+
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                message: "Product not found",
+            });
+        }
+
+        const redirectTo = product.categorySlug !== categorySlug
+            ? `/product/${product.categorySlug}/${product.slug}`
+            : null;
+
+        res.status(200).json({
+            success: true,
+            product,
+            redirectTo,
+        });
+    } catch (error) {
+        console.error("Get Product By Slug Error:", error);
         res.status(500).json({
             success: false,
             message: "Server error fetching product",

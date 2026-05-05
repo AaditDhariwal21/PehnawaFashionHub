@@ -2,6 +2,7 @@ import express from "express";
 import {
     getAllProducts,
     getProductById,
+    getProductBySlug,
     getProductsByCategory,
     getProductsBySpecialTag,
     createProduct,
@@ -21,6 +22,7 @@ router.get("/search", searchProducts);
 router.get("/categories/covers", getCategoryCovers);
 router.get("/category/:categoryName", getProductsByCategory);
 router.get("/tag/:tag", getProductsBySpecialTag);
+router.get("/by-slug/:categorySlug/:productSlug", getProductBySlug);
 router.get("/:id", getProductById);
 
 // Admin only routes (requires authentication + admin role)

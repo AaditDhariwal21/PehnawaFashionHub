@@ -8,6 +8,7 @@ import { useCart } from '../context/CartContext';
 import formatPrice from '../utils/formatPrice';
 import { startingPrice, defaultColor, totalStock as variantTotalStock } from '../utils/variants.js';
 import { getDisplayImages } from '../utils/getDisplayImages';
+import { productUrl } from '../utils/productUrl.js';
 import './ComparePage.css';
 
 const API = import.meta.env.VITE_API_URL;
@@ -58,7 +59,7 @@ const ComparePage = () => {
             (product.variants || []).find((v) => v.stock > 0);
 
         if (!variant) {
-            navigate(`/product/${product._id}`);
+            navigate(productUrl(product));
             return;
         }
 
@@ -201,7 +202,7 @@ const ComparePage = () => {
                                     <td key={p._id}>
                                         <div
                                             className="compare-table__img-wrap"
-                                            onClick={() => navigate(`/product/${p._id}`)}
+                                            onClick={() => navigate(productUrl(p))}
                                         >
                                             {imgUrl ? (
                                                 <img src={imgUrl} alt={p.name} />
@@ -230,7 +231,7 @@ const ComparePage = () => {
                                     <span
                                         className="font-semibold text-gray-900 cursor-pointer hover:text-gray-600 transition-colors"
                                         style={{ fontSize: '1rem' }}
-                                        onClick={() => navigate(`/product/${p._id}`)}
+                                        onClick={() => navigate(productUrl(p))}
                                     >
                                         {p.name}
                                     </span>

@@ -5,6 +5,7 @@ import { useWishlist } from '../context/WishlistContext';
 import { useCompare } from '../context/CompareContext';
 import formatPrice from '../utils/formatPrice';
 import { startingPrice } from '../utils/variants.js';
+import { productUrl } from '../utils/productUrl.js';
 
 const CARD_MIN_WIDTH = 220;  // px — minimum comfortable card width
 const CARD_GAP = 24;         // px — gap between cards
@@ -202,7 +203,7 @@ const NewArrivalsSection = () => {
                             <div
                                 key={product._id}
                                 className="group cursor-pointer min-w-0"
-                                onClick={() => navigate(`/product/${product._id}`)}
+                                onClick={() => navigate(productUrl(product))}
                             >
                                 {/* Product Image */}
                                 <div className="aspect-[3/4] bg-stone-100 rounded-lg overflow-hidden relative mb-2 sm:mb-3">

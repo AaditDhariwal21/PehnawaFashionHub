@@ -5,6 +5,7 @@ import { useWishlist } from '../context/WishlistContext';
 import { useCompare } from '../context/CompareContext';
 import formatPrice from '../utils/formatPrice';
 import { getCardPrice } from '../utils/getEffectivePrice';
+import { productUrl } from '../utils/productUrl.js';
 
 const API = import.meta.env.VITE_API_URL;
 const MAX_RELATED = 6;
@@ -128,7 +129,7 @@ const RelatedProducts = ({ currentProduct }) => {
                                 key={product._id}
                                 className="group flex-shrink-0 cursor-pointer"
                                 style={{ width: 'clamp(11rem, 20vw, 14rem)' }}
-                                onClick={() => navigate(`/product/${product._id}`)}
+                                onClick={() => navigate(productUrl(product))}
                             >
                                 {/* Image */}
                                 <div

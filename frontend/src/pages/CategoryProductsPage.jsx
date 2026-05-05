@@ -6,6 +6,7 @@ import { useWishlist } from '../context/WishlistContext';
 import { useCompare } from '../context/CompareContext';
 import formatPrice from '../utils/formatPrice';
 import { startingPrice } from '../utils/variants.js';
+import { productUrl } from '../utils/productUrl.js';
 
 const CategoryProductsPage = () => {
     const { categoryName } = useParams();
@@ -151,7 +152,7 @@ const CategoryProductsPage = () => {
                             return (
                                 <div
                                     key={product._id}
-                                    onClick={() => navigate(`/product/${product._id}`)}
+                                    onClick={() => navigate(productUrl(product))}
                                     className="group cursor-pointer"
                                 >
                                     {/* Image */}

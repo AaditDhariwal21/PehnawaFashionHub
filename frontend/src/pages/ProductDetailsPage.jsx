@@ -20,7 +20,10 @@ import RelatedProducts from '../components/RelatedProducts';
 import SizeChartModal from '../components/SizeChartModal';
 
 const ProductDetailsPage = () => {
-    const { id } = useParams();
+    // The page is mounted on two routes — slug-based (canonical) and
+    // id-based (legacy). Pick the right fetch URL from whichever params
+    // are present.
+    const { id, categorySlug, productSlug } = useParams();
     const navigate = useNavigate();
     const { addToCart, openCart, setBuyNowItem } = useCart();
     const { isWishlisted, toggleWishlist } = useWishlist();
@@ -37,9 +40,23 @@ const ProductDetailsPage = () => {
         const fetchProduct = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`${import.meta.env.VITE_API_URL}/products/${id}`);
+                const url = productSlug
+                    ? `${import.meta.env.VITE_API_URL}/products/by-slug/${categorySlug}/${productSlug}`
+                    : `${import.meta.env.VITE_API_URL}/products/${id}`;
+                const response = await fetch(url);
                 const data = await response.json();
                 if (!data.success) throw new Error(data.message || 'Product not found');
+
+                // The backend returns `redirectTo` whenever the URL the
+                // browser is on is not the canonical slug URL — either
+                // because it's a legacy /product/:id link, or because
+                // the categorySlug in the path is stale. Swap with
+                // `replace` so we don't pollute browser history.
+                if (data.redirectTo) {
+                    navigate(data.redirectTo, { replace: true });
+                    return;
+                }
+
                 setProduct(data.product);
                 setSelectedColor(defaultColor(data.product));
             } catch (err) {
@@ -49,7 +66,7 @@ const ProductDetailsPage = () => {
             }
         };
         fetchProduct();
-    }, [id]);
+    }, [id, categorySlug, productSlug, navigate]);
 
     // Reset image index when color changes
     useEffect(() => {
