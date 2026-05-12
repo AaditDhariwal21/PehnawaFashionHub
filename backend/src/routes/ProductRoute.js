@@ -20,6 +20,7 @@ const router = express.Router();
 router.get("/", getAllProducts);
 router.get("/search", searchProducts);
 router.get("/categories/covers", getCategoryCovers);
+router.get("/category/:categoryName/:subCategory", getProductsByCategory);
 router.get("/category/:categoryName", getProductsByCategory);
 router.get("/tag/:tag", getProductsBySpecialTag);
 router.get("/by-slug/:categorySlug/:productSlug", getProductBySlug);

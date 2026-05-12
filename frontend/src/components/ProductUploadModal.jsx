@@ -7,7 +7,8 @@ import ColorImagesManager, { finalizeColors } from './ColorImagesManager';
 import { buildVariantMatrix } from '../utils/variants.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
-const categories = ['Anarkalis', 'Coord Sets', 'Lehangas', 'Indo Western', 'Suits & Kurtis', 'Sarees', 'Blouses', 'Kidswear', "Men's Kurta", 'Dupattas', 'Pashminas'];
+const categories = ['Anarkalis', 'Coord Sets', 'Lehangas', 'Indo Western', 'Suits & Kurtis', 'Sarees', 'Blouses', 'Kids', "Men's Kurta", 'Dupattas', 'Pashminas'];
+const KIDS_SUBCATEGORIES = ['Boys', 'Girls'];
 const specialTags = ['', 'New Arrival', 'Best Seller', 'Sale', 'Trending'];
 
 const quillModules = {
@@ -24,7 +25,7 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
     const [formData, setFormData] = useState({
         name: '', shortDescription: '', description: '',
         price: '',
-        category: '', specialTag: '', weight: '',
+        category: '', subCategory: '', specialTag: '', weight: '',
         isCategoryCover: false,
     });
 
@@ -41,7 +42,13 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
+        setFormData((prev) => {
+            const next = { ...prev, [name]: value };
+            // Clear subCategory when leaving Kids so it can't ride
+            // along with a Men/Women product if the admin switches.
+            if (name === 'category' && value !== 'Kids') next.subCategory = '';
+            return next;
+        });
     };
 
     /* ── Sync variant matrix when colors change ── */
@@ -80,6 +87,11 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
         try {
             const token = localStorage.getItem('token');
             if (!token) { setError('You must be logged in.'); setIsLoading(false); return; }
+            if (formData.category === 'Kids' && !KIDS_SUBCATEGORIES.includes(formData.subCategory)) {
+                setError('Please select a subcategory (Boys or Girls) for Kids products.');
+                setIsLoading(false);
+                return;
+            }
             if (!formData.name || !formData.description || !formData.price || !formData.category || !formData.weight) {
                 setError('Please fill in all required fields.'); setIsLoading(false); return;
             }
@@ -120,6 +132,7 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
                 description: formData.description,
                 price: Number(formData.price),
                 category: formData.category,
+                subCategory: formData.category === 'Kids' ? formData.subCategory : null,
                 weight: Number(formData.weight),
                 // The first color's first image is the canonical card thumbnail.
                 images: finalColors[0].images,
@@ -138,7 +151,7 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
             if (!data.success) { setError(data.message || 'Failed to create product.'); setIsLoading(false); return; }
 
             // Reset form
-            setFormData({ name: '', shortDescription: '', description: '', price: '', category: '', specialTag: '', weight: '', isCategoryCover: false });
+            setFormData({ name: '', shortDescription: '', description: '', price: '', category: '', subCategory: '', specialTag: '', weight: '', isCategoryCover: false });
             setColors([]);
             setSizes([]); setVariants([]);
 
@@ -243,6 +256,16 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
                                         </select>
                                     </div>
                                 </div>
+
+                                {formData.category === 'Kids' && (
+                                    <div>
+                                        <label className={labelCls}>Subcategory <span className="text-red-400">*</span></label>
+                                        <select name="subCategory" value={formData.subCategory} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}>
+                                            <option value="">Select Boys or Girls</option>
+                                            {KIDS_SUBCATEGORIES.map((s) => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                    </div>
+                                )}
 
                                 {formData.category && (
                                     <label className="flex items-center gap-2 cursor-pointer" style={{ marginTop: '-0.5rem' }}>

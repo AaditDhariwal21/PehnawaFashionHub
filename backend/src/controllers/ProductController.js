@@ -94,15 +94,54 @@ export const getProductBySlug = async (req, res) => {
     }
 };
 
-// Get products by category (Public - anyone can access)
+// Category aliases for backward compatibility.
+//
+// Legacy products may still carry the old "Kidswear" string in their
+// `category` field if the migration script hasn't been run. Requests
+// for "Kids" should surface those too — and vice versa — so shoppers
+// never see an empty category page during the migration window.
+const CATEGORY_ALIASES = {
+    kids: ["Kids", "Kidswear"],
+    kidswear: ["Kids", "Kidswear"],
+};
+
+const resolveCategoryFilter = (categoryName) => {
+    const key = String(categoryName || "").toLowerCase();
+    const aliases = CATEGORY_ALIASES[key];
+    if (aliases) {
+        return { $in: aliases.map((c) => new RegExp(`^${c}$`, "i")) };
+    }
+    return { $regex: new RegExp(`^${categoryName}$`, "i") };
+};
+
+// Get products by category (Public - anyone can access).
+//
+// Optional `subCategory` filter — supplied either as a route param
+// (/category/:categoryName/:subCategory) or as a query string
+// (?subCategory=Boys). Only meaningful for "Kids".
+//
+// Backward-compat: when filtering for "Kids" + "Girls", we also match
+// records where subCategory is missing entirely. That handles any
+// pre-migration documents and keeps them visible to shoppers.
 export const getProductsByCategory = async (req, res) => {
     try {
         const { categoryName } = req.params;
+        const subCategoryParam = req.params.subCategory || req.query.subCategory;
 
-        // Case-insensitive match
-        const products = await Product.find({
-            category: { $regex: new RegExp(`^${categoryName}$`, 'i') },
-        });
+        const filter = {
+            category: resolveCategoryFilter(categoryName),
+        };
+
+        if (subCategoryParam) {
+            const matchValue = new RegExp(`^${subCategoryParam}$`, 'i');
+            filter.$or = [{ subCategory: matchValue }];
+            if (/^girls$/i.test(subCategoryParam)) {
+                filter.$or.push({ subCategory: null });
+                filter.$or.push({ subCategory: { $exists: false } });
+            }
+        }
+
+        const products = await Product.find(filter);
 
         res.status(200).json({
             success: true,
@@ -149,7 +188,7 @@ export const createProduct = async (req, res) => {
     try {
         const {
             name, description, shortDescription, price,
-            category, images, colors, variants, specialTag, weight, isCategoryCover,
+            category, subCategory, images, colors, variants, specialTag, weight, isCategoryCover,
         } = req.body;
 
         if (!name || !description || !price || !category || !weight) {
@@ -157,6 +196,18 @@ export const createProduct = async (req, res) => {
                 success: false,
                 message: "Please provide name, description, price, category, and weight",
             });
+        }
+
+        // Subcategory is required only for Kids — and must be one of
+        // the allowed values when present. Outside Kids the field is
+        // silently ignored (the pre-save hook nulls it).
+        if (category === "Kids") {
+            if (!subCategory || !["Boys", "Girls"].includes(subCategory)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Kids products must have subCategory set to 'Boys' or 'Girls'.",
+                });
+            }
         }
 
         // Validate variant matrix
@@ -182,6 +233,7 @@ export const createProduct = async (req, res) => {
             description,
             price,
             category,
+            subCategory: category === "Kids" ? subCategory : null,
             images: images || [],
             colors: colors || [],
             variants: cleanVariants,
@@ -251,12 +303,22 @@ export const updateProduct = async (req, res) => {
         // mongoose internals; assign explicitly to known paths instead.
         const assignable = [
             "name", "shortDescription", "description", "price",
-            "category", "weight", "specialTag", "images", "colors",
+            "category", "subCategory", "weight", "specialTag", "images", "colors",
         ];
         for (const key of assignable) {
             if (req.body[key] !== undefined) product[key] = req.body[key];
         }
         product.isCategoryCover = wantsCover;
+
+        // Validate subCategory against the (possibly updated) category.
+        // The pre-save hook also normalizes this, but a 400 here gives
+        // the admin a clear message instead of silent coercion.
+        if (product.category === "Kids" && !["Boys", "Girls"].includes(product.subCategory)) {
+            return res.status(400).json({
+                success: false,
+                message: "Kids products must have subCategory set to 'Boys' or 'Girls'.",
+            });
+        }
 
         await product.save();
 

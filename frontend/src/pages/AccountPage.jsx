@@ -411,7 +411,7 @@ const AccountPage = () => {
                                                     <div className="account-order-thumb-wrap">
                                                         <div className="account-order-thumb">
                                                             {firstItem?.image ? (
-                                                                <img src={firstItem.image} alt={firstItem.name || 'Product'} />
+                                                                <img src={firstItem.image} alt={firstItem?.name || "Product Image"} />
                                                             ) : (
                                                                 <span className="account-order-thumb-placeholder">📦</span>
                                                             )}

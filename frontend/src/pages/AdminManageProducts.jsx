@@ -8,10 +8,12 @@ import formatPrice from '../utils/formatPrice';
 import VariantMatrix from '../components/VariantMatrix';
 import ColorImagesManager, { finalizeColors } from '../components/ColorImagesManager';
 import { buildVariantMatrix, totalStock as variantTotalStock } from '../utils/variants.js';
+import { displayCategory } from '../utils/displayCategory.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-const categories = ['Anarkalis', 'Coord Sets', 'Lehangas', 'Indo Western', 'Suits & Kurtis', 'Sarees', 'Blouses', 'Kidswear', "Men's Kurta", 'Dupattas', 'Pashminas'];
+const categories = ['Anarkalis', 'Coord Sets', 'Lehangas', 'Indo Western', 'Suits & Kurtis', 'Sarees', 'Blouses', 'Kids', "Men's Kurta", 'Dupattas', 'Pashminas'];
+const KIDS_SUBCATEGORIES = ['Boys', 'Girls'];
 const specialTags = ['', 'New Arrival', 'Best Seller', 'Sale', 'Trending'];
 
 const quillModules = {
@@ -32,16 +34,30 @@ const quillFormats = ['bold', 'italic', 'underline', 'list', 'link'];
 // about stale state leaking between sessions.
 const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
     /* ── Form fields, initialised straight from `product` ── */
-    const [formData, setFormData] = useState(() => ({
-        name: product.name || '',
-        shortDescription: product.shortDescription || '',
-        description: product.description || '',
-        price: product.price ?? '',
-        category: product.category || '',
-        specialTag: product.specialTag || '',
-        weight: product.weight ?? '',
-        isCategoryCover: !!product.isCategoryCover,
-    }));
+    const [formData, setFormData] = useState(() => {
+        // Normalize legacy "Kidswear" records to "Kids" on load so the
+        // category dropdown has a matching option (Kidswear is no
+        // longer in the list). Saving the form persists the
+        // normalized value, which finishes the migration for that
+        // single record.
+        const normalizedCategory = displayCategory(product.category || '');
+        const isKids = normalizedCategory === 'Kids';
+        return {
+            name: product.name || '',
+            shortDescription: product.shortDescription || '',
+            description: product.description || '',
+            price: product.price ?? '',
+            category: normalizedCategory,
+            // Backward-compat: a Kids product with no subCategory is
+            // treated as "Girls" so the dropdown shows a valid
+            // selection for legacy records the admin opens before
+            // running the migration script.
+            subCategory: product.subCategory || (isKids ? 'Girls' : ''),
+            specialTag: product.specialTag || '',
+            weight: product.weight ?? '',
+            isCategoryCover: !!product.isCategoryCover,
+        };
+    });
 
     /* ── Color/image state in the unified ColorImagesManager shape ── */
     const [colors, setColors] = useState(() =>
@@ -98,7 +114,13 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData((p) => ({ ...p, [name]: value }));
+        setFormData((p) => {
+            const next = { ...p, [name]: value };
+            // Switching away from Kids must drop any stale subCategory
+            // so we don't post Boys/Girls alongside a non-Kids product.
+            if (name === 'category' && value !== 'Kids') next.subCategory = '';
+            return next;
+        });
     };
 
     /* ── Sync the variant matrix when the color list changes ── */
@@ -161,12 +183,19 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
                 stock: Math.max(0, Number(v.stock) || 0),
             }));
 
+            if (formData.category === 'Kids' && !KIDS_SUBCATEGORIES.includes(formData.subCategory)) {
+                setError('Please select a subcategory (Boys or Girls) for Kids products.');
+                setIsLoading(false);
+                return;
+            }
+
             const body = {
                 name: formData.name,
                 shortDescription: formData.shortDescription,
                 description: formData.description,
                 price: Number(formData.price),
                 category: formData.category,
+                subCategory: formData.category === 'Kids' ? formData.subCategory : null,
                 weight: Number(formData.weight) || 0,
                 specialTag: formData.specialTag || null,
                 isCategoryCover: formData.isCategoryCover,
@@ -272,6 +301,16 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
                                 <div><label className={labelCls}>Category *</label><select name="category" value={formData.category} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}><option value="">Select</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                                 <div><label className={labelCls}>Special Tag</label><select name="specialTag" value={formData.specialTag} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}><option value="">None</option>{specialTags.filter(Boolean).map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                             </div>
+                            {formData.category === 'Kids' && (
+                                <div>
+                                    <label className={labelCls}>Subcategory *</label>
+                                    <select name="subCategory" value={formData.subCategory} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}>
+                                        <option value="">Select Boys or Girls</option>
+                                        {KIDS_SUBCATEGORIES.map((s) => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                            )}
+
                             {formData.category && (
                                 <label className="flex items-center gap-2 cursor-pointer" style={{ marginTop: '-0.5rem' }}>
                                     <input type="checkbox" checked={formData.isCategoryCover} onChange={(e) => setFormData(p => ({ ...p, isCategoryCover: e.target.checked }))} className="w-4 h-4 rounded cursor-pointer accent-amber-500" />
@@ -556,7 +595,7 @@ const AdminManageProducts = () => {
 
                                     <div className="w-11 h-11 rounded-md overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center cursor-pointer" onClick={() => setEditProduct(product)}>
                                         {thumb ? (
-                                            <img src={thumb} alt={product.name} className="w-full h-full object-cover" />
+                                            <img src={thumb} alt={product?.name || "Product Image"} className="w-full h-full object-cover" />
                                         ) : (
                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -566,7 +605,7 @@ const AdminManageProducts = () => {
 
                                     <p className="text-sm font-medium text-gray-900 truncate cursor-pointer mt-2 md:mt-0" onClick={() => setEditProduct(product)}>{product.name}</p>
 
-                                    <span className="text-xs text-gray-500 md:text-sm">{product.category}</span>
+                                    <span className="text-xs text-gray-500 md:text-sm">{displayCategory(product.category)}{product.subCategory ? ` / ${product.subCategory}` : ''}</span>
 
                                     <span className="text-sm font-semibold text-gray-800 md:text-right">{formatPrice(product.price)}</span>
 

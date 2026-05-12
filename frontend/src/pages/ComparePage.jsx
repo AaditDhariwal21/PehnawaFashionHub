@@ -9,6 +9,7 @@ import formatPrice from '../utils/formatPrice';
 import { startingPrice, defaultColor, totalStock as variantTotalStock } from '../utils/variants.js';
 import { getDisplayImages } from '../utils/getDisplayImages';
 import { productUrl } from '../utils/productUrl.js';
+import { displayCategory } from '../utils/displayCategory.js';
 import './ComparePage.css';
 
 const API = import.meta.env.VITE_API_URL;
@@ -205,7 +206,7 @@ const ComparePage = () => {
                                             onClick={() => navigate(productUrl(p))}
                                         >
                                             {imgUrl ? (
-                                                <img src={imgUrl} alt={p.name} />
+                                                <img src={imgUrl} alt={p?.name || "Product Image"} />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center">
                                                     <span style={{ fontSize: '3rem', color: '#d1d5db' }}>📷</span>
@@ -268,10 +269,10 @@ const ComparePage = () => {
                                 <td key={p._id}>
                                     <span
                                         className="compare-attr-pill cursor-pointer"
-                                        onClick={() => navigate(`/products/${p.category}`)}
+                                        onClick={() => navigate(`/products/${encodeURIComponent(displayCategory(p.category))}`)}
                                         style={{ cursor: 'pointer' }}
                                     >
-                                        {p.category}
+                                        {displayCategory(p.category)}
                                     </span>
                                 </td>
                             ))}

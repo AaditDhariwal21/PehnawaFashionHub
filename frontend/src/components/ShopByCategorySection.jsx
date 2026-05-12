@@ -16,7 +16,7 @@ const ShopByCategorySection = () => {
         { id: 6, name: 'Suits & Kurtis' },
         { id: 7, name: 'Sarees' },
         { id: 8, name: 'Blouses' },
-        { id: 9, name: 'Kidswear' },
+        { id: 9, name: 'Kids' },
         { id: 10, name: "Men's Kurta" },
         { id: 11, name: 'Dupattas' },
         { id: 12, name: 'Pashminas' },

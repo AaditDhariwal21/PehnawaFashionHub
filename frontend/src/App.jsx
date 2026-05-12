@@ -48,6 +48,7 @@ function App() {
             <Route path="/adminDashboard" element={<AdminDashboard />} />
             <Route path="/product/:categorySlug/:productSlug" element={<ProductDetailsPage />} />
             <Route path="/product/:id" element={<ProductDetailsPage />} />
+            <Route path="/products/:categoryName/:subCategory" element={<CategoryProductsPage />} />
             <Route path="/products/:categoryName" element={<CategoryProductsPage />} />
             <Route path="/cart" element={<CartPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />

@@ -79,7 +79,14 @@ const CATEGORY_TO_CHART = {
     "Men's Kurta":     'menKurta',
 
     // Kids
-    'Kidswear':        'kids',
+    'Kids':            'kids',
+};
+
+// Aliases for categories that may still exist in legacy product
+// records. Normalized before the table lookup so the data map itself
+// stays free of deprecated names.
+const CATEGORY_ALIASES = {
+    'kidswear': 'Kids',
 };
 
 /**
@@ -88,8 +95,9 @@ const CATEGORY_TO_CHART = {
  */
 export const getSizeChartKey = (category) => {
     if (!category) return null;
-    if (CATEGORY_TO_CHART[category]) return CATEGORY_TO_CHART[category];
-    const lower = category.toLowerCase();
+    const normalized = CATEGORY_ALIASES[category.toLowerCase()] || category;
+    if (CATEGORY_TO_CHART[normalized]) return CATEGORY_TO_CHART[normalized];
+    const lower = normalized.toLowerCase();
     const match = Object.keys(CATEGORY_TO_CHART).find(
         (k) => k.toLowerCase() === lower
     );

@@ -165,7 +165,7 @@ const AdminOrderDetailPage = () => {
                                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
                                         <div style={{ width: '3.5rem', height: '4.5rem', borderRadius: '0.4rem', overflow: 'hidden', background: '#f3f4f6', border: '1px solid #e5e7eb', flexShrink: 0 }}>
                                             {item.image ? (
-                                                <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                <img src={item.image} alt={item?.name || "Product Image"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                             ) : (
                                                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '1.2rem' }}>📷</div>
                                             )}

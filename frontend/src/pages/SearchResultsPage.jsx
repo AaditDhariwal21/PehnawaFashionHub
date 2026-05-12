@@ -141,7 +141,7 @@ const SearchResultsPage = () => {
                                         {imageUrl ? (
                                             <img
                                                 src={imageUrl}
-                                                alt={product.name}
+                                                alt={product?.name || "Product Image"}
                                                 className="search-results__card-img"
                                             />
                                         ) : (

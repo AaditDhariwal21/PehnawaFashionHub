@@ -6,6 +6,7 @@ import { useCompare } from '../context/CompareContext';
 import formatPrice from '../utils/formatPrice';
 import { startingPrice } from '../utils/variants.js';
 import { productUrl } from '../utils/productUrl.js';
+import { displayCategory } from '../utils/displayCategory.js';
 
 const CARD_MIN_WIDTH = 220;  // px — minimum comfortable card width
 const CARD_GAP = 24;         // px — gap between cards
@@ -210,7 +211,7 @@ const NewArrivalsSection = () => {
                                     {product.images && product.images.length > 0 ? (
                                         <img
                                             src={product.images[0].url}
-                                            alt={product.name}
+                                            alt={product?.name || "Product Image"}
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                         />
                                     ) : (
@@ -264,7 +265,7 @@ const NewArrivalsSection = () => {
                                         className="text-gray-800 font-normal leading-snug mb-1 line-clamp-2"
                                         style={{ fontSize: 'clamp(0.75rem, 1.5vw, 1rem)' }}
                                     >
-                                        {product.name} - {product.category}
+                                        {product.name} - {displayCategory(product.category)}
                                     </h3>
                                     <p
                                         className="text-gray-600 font-medium"

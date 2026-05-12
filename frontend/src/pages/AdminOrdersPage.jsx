@@ -136,7 +136,7 @@ const AdminOrdersPage = () => {
                                                     {firstItem?.image ? (
                                                         <img
                                                             src={firstItem.image}
-                                                            alt={firstItem.name || 'Product'}
+                                                            alt={firstItem?.name || "Product Image"}
                                                             style={{
                                                                 width: '50px', height: '50px', borderRadius: '0.5rem',
                                                                 objectFit: 'cover', border: '1px solid #f3f4f6',

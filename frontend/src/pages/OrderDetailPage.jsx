@@ -84,7 +84,7 @@ const OrderDetailPage = () => {
                                 <div key={i} className="odp-item">
                                     <div className="odp-item-img-wrap">
                                         {item.image ? (
-                                            <img src={item.image} alt={item.name} />
+                                            <img src={item.image} alt={item?.name || "Product Image"} />
                                         ) : (
                                             <div className="odp-item-placeholder">📷</div>
                                         )}

@@ -9,6 +9,7 @@ import formatPrice from '../utils/formatPrice';
 import { findVariant, startingPrice, displayPrice, hasDiscount, defaultColor, totalStock as variantTotalStock } from '../utils/variants.js';
 import { getDisplayImages } from '../utils/getDisplayImages';
 import { productUrl } from '../utils/productUrl.js';
+import { displayCategory } from '../utils/displayCategory.js';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -231,7 +232,7 @@ const WishlistPage = () => {
                                             {imageUrl ? (
                                                 <img
                                                     src={imageUrl}
-                                                    alt={product.name}
+                                                    alt={product?.name || "Product Image"}
                                                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                                 />
                                             ) : (
@@ -277,7 +278,7 @@ const WishlistPage = () => {
                                         <div style={{ padding: '1rem 1rem 1.15rem' }}>
                                             {/* Category */}
                                             <p className="uppercase tracking-wider text-gray-400 truncate" style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.08em', marginBottom: '0.25rem' }}>
-                                                {product.category}
+                                                {displayCategory(product.category)}
                                             </p>
 
                                             {/* Name */}

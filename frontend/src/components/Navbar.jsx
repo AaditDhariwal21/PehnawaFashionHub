@@ -7,17 +7,32 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import SearchOverlay from './SearchOverlay';
 
-/* ─── Category hierarchy ─── */
+/* ─── Category hierarchy ───
+ *
+ * Each `items[]` is rendered in the dropdown. `path` controls where
+ * the link goes — categories under Men/Women are leaf categories
+ * (e.g. /products/Anarkalis), while items under Kids are subcategories
+ * of the parent "Kids" category (e.g. /products/Kids/Boys).
+ */
 const NAV_GROUPS = [
     {
         label: 'Women',
         items: [
             'Anarkalis', 'Coord Sets', 'Lehangas', 'Indo Western',
             'Suits & Kurtis', 'Sarees', 'Blouses', 'Dupattas', 'Pashminas',
+        ].map((c) => ({ label: c, path: `/products/${encodeURIComponent(c)}` })),
+    },
+    {
+        label: 'Men',
+        items: [{ label: "Men's Kurta", path: `/products/${encodeURIComponent("Men's Kurta")}` }],
+    },
+    {
+        label: 'Kids',
+        items: [
+            { label: 'Boys', path: '/products/Kids/Boys' },
+            { label: 'Girls', path: '/products/Kids/Girls' },
         ],
     },
-    { label: 'Men', items: ["Men's Kurta"] },
-    { label: 'Kids', items: ['Kidswear'] },
 ];
 
 const Navbar = () => {
@@ -56,8 +71,8 @@ const Navbar = () => {
         return user.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
     };
 
-    const goToCategory = (cat) => {
-        navigate(`/products/${encodeURIComponent(cat)}`);
+    const goToCategory = (item) => {
+        navigate(item.path);
         setMobileOpen(false);
         setHoveredGroup(null);
     };
@@ -149,7 +164,7 @@ const Navbar = () => {
                                         >
                                             {group.items.map((item) => (
                                                 <button
-                                                    key={item}
+                                                    key={item.label}
                                                     onClick={() => goToCategory(item)}
                                                     className="dropdown-item"
                                                     style={{
@@ -178,7 +193,7 @@ const Navbar = () => {
                                                         e.currentTarget.style.paddingLeft = '1.5rem';
                                                     }}
                                                 >
-                                                    {item}
+                                                    {item.label}
                                                 </button>
                                             ))}
                                         </div>
@@ -361,8 +376,8 @@ const Navbar = () => {
                                 </button>
                                 <div className="overflow-hidden transition-all duration-200 ease-in-out" style={{ maxHeight: open ? `${group.items.length * 2.75}rem` : '0', opacity: open ? 1 : 0 }}>
                                     {group.items.map((item) => (
-                                        <button key={item} onClick={() => goToCategory(item)} className="w-full text-left px-8 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors cursor-pointer bg-transparent border-none" style={{ fontFamily: 'inherit' }}>
-                                            {item}
+                                        <button key={item.label} onClick={() => goToCategory(item)} className="w-full text-left px-8 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors cursor-pointer bg-transparent border-none" style={{ fontFamily: 'inherit' }}>
+                                            {item.label}
                                         </button>
                                     ))}
                                     <div className="h-1"></div>

@@ -110,7 +110,7 @@ const CompareBar = () => {
                                     {item.image ? (
                                         <img
                                             src={item.image}
-                                            alt={item.name}
+                                            alt={item?.name || "Product Image"}
                                             style={{
                                                 width: '100%',
                                                 height: '100%',

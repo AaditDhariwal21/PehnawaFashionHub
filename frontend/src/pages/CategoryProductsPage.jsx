@@ -7,9 +7,10 @@ import { useCompare } from '../context/CompareContext';
 import formatPrice from '../utils/formatPrice';
 import { startingPrice } from '../utils/variants.js';
 import { productUrl } from '../utils/productUrl.js';
+import { displayCategory } from '../utils/displayCategory.js';
 
 const CategoryProductsPage = () => {
-    const { categoryName } = useParams();
+    const { categoryName, subCategory } = useParams();
     const navigate = useNavigate();
     const { isWishlisted, toggleWishlist } = useWishlist();
     const { isInCompare, toggleCompare } = useCompare();
@@ -18,16 +19,23 @@ const CategoryProductsPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const displayName = decodeURIComponent(categoryName);
+    // When a subcategory is present (Kids / Boys, Kids / Girls), use
+    // it as the heading. Otherwise fall back to the category itself.
+    // Normalize the URL slug through displayCategory so a stale
+    // /products/Kidswear bookmark still renders as "Kids".
+    const displayName = subCategory
+        ? `${displayCategory(decodeURIComponent(categoryName))} — ${decodeURIComponent(subCategory)}`
+        : displayCategory(decodeURIComponent(categoryName));
 
     useEffect(() => {
         const fetchProducts = async () => {
             try {
                 setLoading(true);
                 setError(null);
-                const response = await fetch(
-                    `${import.meta.env.VITE_API_URL}/products/category/${encodeURIComponent(categoryName)}`
-                );
+                const url = subCategory
+                    ? `${import.meta.env.VITE_API_URL}/products/category/${encodeURIComponent(categoryName)}/${encodeURIComponent(subCategory)}`
+                    : `${import.meta.env.VITE_API_URL}/products/category/${encodeURIComponent(categoryName)}`;
+                const response = await fetch(url);
                 const data = await response.json();
 
                 if (!data.success) {
@@ -43,7 +51,7 @@ const CategoryProductsPage = () => {
         };
 
         fetchProducts();
-    }, [categoryName]);
+    }, [categoryName, subCategory]);
 
     /* ───────────────── Loading ───────────────── */
     if (loading) {
@@ -163,7 +171,7 @@ const CategoryProductsPage = () => {
                                         {imageUrl ? (
                                             <img
                                                 src={imageUrl}
-                                                alt={product.name}
+                                                alt={product?.name || "Product Image"}
                                                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                             />
                                         ) : (

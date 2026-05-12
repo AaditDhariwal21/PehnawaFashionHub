@@ -139,7 +139,7 @@ const RelatedProducts = ({ currentProduct }) => {
                                     {imageUrl ? (
                                         <img
                                             src={imageUrl}
-                                            alt={product.name}
+                                            alt={product?.name || "Product Image"}
                                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                         />
                                     ) : (
