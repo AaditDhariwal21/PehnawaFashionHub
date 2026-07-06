@@ -89,12 +89,10 @@ const Navbar = () => {
 
     return (
         <>
-            <div className="h-[4.75rem]"></div>
+            <div className="h-14 lg:h-[4.75rem]"></div>
 
-            <nav
-                className="fixed top-0 left-0 w-full bg-white z-50"
-                style={{ height: '4.75rem', borderBottom: '1px solid #e5e7eb' }}
-            >
+            <nav className="fixed top-0 left-0 w-full bg-white z-50 h-14 lg:h-[4.75rem] border-b border-gray-200">
+
                 <div
                     className="flex items-center h-full"
                     style={{ padding: '0 clamp(1rem, 3vw, 2.5rem)' }}
@@ -113,8 +111,7 @@ const Navbar = () => {
                         <img
                             src={logo}
                             alt="Pehnawa"
-                            className="w-auto object-contain block"
-                            style={{ height: 'calc(4.75rem - 0.75rem)' }}
+                            className="w-auto object-contain block h-10 lg:h-16"
                         />
                     </div>
 
@@ -241,7 +238,7 @@ const Navbar = () => {
                     </button>
 
                     {/* ══════ RIGHT: Profile + Bag ══════ */}
-                    <div className="flex items-center flex-shrink-0 gap-3">
+                    <div className="flex items-center flex-shrink-0 gap-1 sm:gap-3">
                         {/* Profile */}
                         <div ref={accountRef} className="relative">
                             <button
@@ -351,45 +348,91 @@ const Navbar = () => {
             )}
 
             <div
-                className="fixed top-0 left-0 bottom-0 z-50 w-[min(320px,85vw)] bg-white shadow-2xl lg:hidden flex flex-col transition-transform duration-300 ease-in-out"
+                className="fixed top-0 left-0 bottom-0 z-50 w-[min(400px,88vw)] bg-white shadow-2xl lg:hidden flex flex-col transition-transform duration-300 ease-in-out"
                 style={{ transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)' }}
             >
-                <div className="flex items-center justify-between px-5 h-14 border-b border-gray-100 flex-shrink-0">
-                    <span className="text-sm font-bold text-gray-900 uppercase tracking-widest">Menu</span>
-                    <button onClick={() => setMobileOpen(false)} className="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer">
+                {/* Drawer Header */}
+                <div className="flex items-center justify-between px-6 h-14 border-b border-gray-100 flex-shrink-0">
+                    <span className="text-[0.8rem] font-bold text-gray-900 uppercase tracking-[0.15em]">Menu</span>
+                    <button
+                        onClick={() => setMobileOpen(false)}
+                        className="w-10 h-10 -mr-2 flex items-center justify-center text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-50 transition-colors cursor-pointer"
+                    >
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto">
+                {/* Nav Groups — scrollable */}
+                <div className="flex-1 overflow-y-auto overscroll-contain py-1">
                     {NAV_GROUPS.map((group) => {
                         const open = expandedGroup === group.label;
                         return (
-                            <div key={group.label} className="border-b border-gray-50">
+                            <div key={group.label} className="border-b border-gray-100/80">
                                 <button
                                     onClick={() => toggleMobileGroup(group.label)}
-                                    className="w-full flex items-center justify-between px-5 py-3.5 bg-transparent border-none cursor-pointer"
+                                    className="w-full flex items-center justify-between px-6 min-h-[2.75rem] bg-transparent border-none cursor-pointer"
                                     style={{ fontFamily: 'inherit' }}
                                 >
-                                    <span className="text-sm font-bold text-gray-900 uppercase tracking-wider">{group.label}</span>
-                                    <ChevronDown className="w-4 h-4 text-gray-400 transition-transform duration-200" style={{ transform: open ? 'rotate(180deg)' : 'rotate(0)' }} />
+                                    <span className="text-[0.8rem] font-semibold text-gray-900 uppercase tracking-wider">{group.label}</span>
+                                    <ChevronDown
+                                        className="w-4 h-4 text-gray-400 transition-transform duration-200"
+                                        style={{ transform: open ? 'rotate(180deg)' : 'rotate(0)' }}
+                                    />
                                 </button>
-                                <div className="overflow-hidden transition-all duration-200 ease-in-out" style={{ maxHeight: open ? `${group.items.length * 2.75}rem` : '0', opacity: open ? 1 : 0 }}>
+                                <div
+                                    className="overflow-hidden transition-all duration-250 ease-in-out"
+                                    style={{ maxHeight: open ? `${group.items.length * 2.75 + 0.5}rem` : '0', opacity: open ? 1 : 0 }}
+                                >
                                     {group.items.map((item) => (
-                                        <button key={item.label} onClick={() => goToCategory(item)} className="w-full text-left px-8 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors cursor-pointer bg-transparent border-none" style={{ fontFamily: 'inherit' }}>
+                                        <button
+                                            key={item.label}
+                                            onClick={() => goToCategory(item)}
+                                            className="w-full text-left pl-9 pr-6 min-h-[2.75rem] flex items-center text-[0.82rem] text-gray-500 hover:text-gray-900 hover:bg-gray-50/80 transition-colors cursor-pointer bg-transparent border-none"
+                                            style={{ fontFamily: 'inherit' }}
+                                        >
                                             {item.label}
                                         </button>
                                     ))}
-                                    <div className="h-1"></div>
+                                    <div className="h-1.5"></div>
                                 </div>
                             </div>
                         );
                     })}
                 </div>
 
-                {!isLoggedIn && (
-                    <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
-                        <button onClick={() => { setMobileOpen(false); navigate('/signin'); }} className="w-full py-2.5 text-sm font-bold text-white rounded-lg cursor-pointer border-none" style={{ background: 'linear-gradient(135deg, #EFBF04, #d4a904)' }}>
+                {/* Bottom Section — sticky */}
+                {isLoggedIn ? (
+                    <div
+                        className="px-6 py-4 border-t border-gray-100 flex-shrink-0"
+                        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+                    >
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => { setMobileOpen(false); navigate('/account'); }}
+                                className="flex-1 py-2.5 text-[0.8rem] font-semibold text-gray-700 bg-gray-100 rounded-lg cursor-pointer border-none hover:bg-gray-200 transition-colors"
+                                style={{ fontFamily: 'inherit' }}
+                            >
+                                My Account
+                            </button>
+                            <button
+                                onClick={() => { setMobileOpen(false); logout(); navigate('/'); }}
+                                className="flex-1 py-2.5 text-[0.8rem] font-semibold text-gray-500 bg-gray-50 rounded-lg cursor-pointer border-none hover:bg-gray-100 transition-colors"
+                                style={{ fontFamily: 'inherit' }}
+                            >
+                                Logout
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div
+                        className="px-6 py-4 border-t border-gray-100 flex-shrink-0"
+                        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+                    >
+                        <button
+                            onClick={() => { setMobileOpen(false); navigate('/signin'); }}
+                            className="w-full py-3 text-[0.82rem] font-bold text-white rounded-lg cursor-pointer border-none transition-opacity hover:opacity-90"
+                            style={{ background: 'linear-gradient(135deg, #EFBF04, #d4a904)', fontFamily: 'inherit' }}
+                        >
                             Sign In
                         </button>
                     </div>

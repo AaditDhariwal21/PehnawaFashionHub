@@ -8,9 +8,7 @@ import { startingPrice } from '../utils/variants.js';
 import { productUrl } from '../utils/productUrl.js';
 import { displayCategory } from '../utils/displayCategory.js';
 
-const CARD_MIN_WIDTH = 220;  // px — minimum comfortable card width
-const CARD_GAP = 24;         // px — gap between cards
-const ARROW_SPACE = 120;     // px — space reserved for both arrows
+const CARD_MIN_WIDTH = 180;  // px — minimum comfortable card width
 const MAX_CARDS = 5;         // never show more than 5 at once
 
 const NewArrivalsSection = () => {
@@ -24,13 +22,19 @@ const NewArrivalsSection = () => {
     const [isAnimating, setIsAnimating] = useState(false);
     const [animationClass, setAnimationClass] = useState('');
     const [itemsPerPage, setItemsPerPage] = useState(2);
+    const [cardGap, setCardGap] = useState(24);
 
     // Measure container and compute how many cards fit
     useEffect(() => {
         const measure = () => {
             if (!containerRef.current) return;
-            const containerWidth = containerRef.current.offsetWidth - ARROW_SPACE;
-            const count = Math.min(MAX_CARDS, Math.max(1, Math.floor((containerWidth + CARD_GAP) / (CARD_MIN_WIDTH + CARD_GAP))));
+            const w = containerRef.current.offsetWidth;
+            // Reserved space for arrows + breathing room on both sides
+            const arrowSpace = w < 640 ? 88 : w < 1024 ? 120 : 152;
+            const gap = w < 640 ? 16 : w < 1024 ? 20 : 24;
+            const available = w - arrowSpace;
+            const count = Math.min(MAX_CARDS, Math.max(1, Math.floor((available + gap) / (CARD_MIN_WIDTH + gap))));
+            setCardGap(gap);
             setItemsPerPage(count);
         };
 
@@ -153,44 +157,44 @@ const NewArrivalsSection = () => {
 
     return (
         <div
-            ref={containerRef}
             className="w-full flex flex-col items-center"
             style={{
-                paddingTop: 'clamp(1.5rem, 4vw, 3rem)',
-                paddingBottom: 'clamp(2.5rem, 6vw, 6rem)',
-                gap: 'clamp(1.25rem, 3vw, 3rem)',
+                paddingTop: 'clamp(1.25rem, 3.5vw, 3rem)',
+                paddingBottom: 'clamp(2rem, 5vw, 6rem)',
+                gap: 'clamp(1rem, 2.5vw, 3rem)',
                 background: 'linear-gradient(to bottom, #FFFFFF 0%, #FFFFFF 85%, #FAD76C 100%)',
             }}
         >
             {/* Section Title */}
             <h2
                 className="font-light text-gray-900 tracking-wide uppercase text-center px-4"
-                style={{ fontSize: 'clamp(1.5rem, 4vw, 3rem)' }}
+                style={{ fontSize: 'clamp(1.25rem, 3.5vw, 3rem)' }}
             >
                 New Arrivals
             </h2>
 
             {/* Products Carousel */}
-            <div className="flex items-center w-full px-2 sm:px-4 overflow-hidden">
-                {/* Left Arrow */}
-                <button
-                    onClick={handlePrev}
-                    disabled={isAnimating || products.length === 0}
-                    className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-white rounded-full shadow-md flex items-center justify-center text-gray-600 hover:text-gray-900 hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer z-10"
-                >
-                    <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
-                </button>
+            <div className="w-full max-w-[1700px] mx-auto px-8 sm:px-12 md:px-16 lg:px-24 xl:px-32 2xl:px-44">
+                <div ref={containerRef} className="flex items-center w-full overflow-hidden gap-3 sm:gap-5 lg:gap-7">
+                    {/* Left Arrow */}
+                    <button
+                        onClick={handlePrev}
+                        disabled={isAnimating || products.length === 0}
+                        className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-stone-200 rounded-full shadow-md flex items-center justify-center text-gray-700 hover:bg-stone-300 hover:text-gray-900 hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer z-10"
+                    >
+                        <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
+                    </button>
 
-                {/* Products Grid */}
-                <div
-                    id="products-grid"
-                    className="flex-1 grid mx-2 sm:mx-4"
-                    style={{
-                        gridTemplateColumns: `repeat(${itemsPerPage}, 1fr)`,
-                        gap: `${CARD_GAP}px`,
-                        ...(animationClass.startsWith('slide-out') ? getAnimationStyle() : {}),
-                    }}
-                >
+                    {/* Products Grid */}
+                    <div
+                        id="products-grid"
+                        className="flex-1 grid min-w-0"
+                        style={{
+                            gridTemplateColumns: `repeat(${itemsPerPage}, 1fr)`,
+                            gap: `${cardGap}px`,
+                            ...(animationClass.startsWith('slide-out') ? getAnimationStyle() : {}),
+                        }}
+                    >
                     {loading ? (
                         Array.from({ length: itemsPerPage }).map((_, index) => (
                             <div key={index}>
@@ -297,14 +301,15 @@ const NewArrivalsSection = () => {
                     )}
                 </div>
 
-                {/* Right Arrow */}
-                <button
-                    onClick={handleNext}
-                    disabled={isAnimating || products.length === 0}
-                    className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-white rounded-full shadow-md flex items-center justify-center text-gray-600 hover:text-gray-900 hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer z-10"
-                >
-                    <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
-                </button>
+                    {/* Right Arrow */}
+                    <button
+                        onClick={handleNext}
+                        disabled={isAnimating || products.length === 0}
+                        className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-stone-200 rounded-full shadow-md flex items-center justify-center text-gray-700 hover:bg-stone-300 hover:text-gray-900 hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer z-10"
+                    >
+                        <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
+                    </button>
+                </div>
             </div>
 
             {/* Page Indicators */}

@@ -41,40 +41,38 @@ const ShopByCategorySection = () => {
         <div
             className="w-full flex flex-col items-center"
             style={{
-                paddingTop: 'clamp(1.5rem, 4vw, 3rem)',
-                paddingBottom: 'clamp(2.5rem, 6vw, 6rem)',
-                gap: 'clamp(1.25rem, 3vw, 3rem)',
-                background: 'linear-gradient(to bottom, #FAD76C 0%, #FAD76C 85%, #FFFFFF 100%)',
+                paddingTop: 'clamp(1rem, 2vw, 1.75rem)',
+                paddingBottom: 'clamp(3.5rem, 7vw, 8rem)',
+                gap: 'clamp(1.25rem, 3vw, 3.5rem)',
+                background: 'linear-gradient(to bottom, #FAD76C 0%, #FAD76C 88%, #FFFFFF 100%)',
             }}
         >
             {/* Section Title */}
             <h2
                 className="font-light text-gray-900 tracking-wide uppercase text-center px-4"
-                style={{ fontSize: 'clamp(1.5rem, 4vw, 3rem)' }}
+                style={{ fontSize: 'clamp(1.25rem, 3.5vw, 3rem)' }}
             >
                 Shop by Category
             </h2>
 
             {/*
                 12 categories → equal rows at every breakpoint:
-                  default : 1 col  × 12 rows
-                  ≥480px  : 2 cols ×  6 rows
+                  default : 2 cols ×  6 rows
                   ≥640px  : 3 cols ×  4 rows
                   ≥768px  : 4 cols ×  3 rows
                   ≥1024px : 6 cols ×  2 rows
             */}
             <div
                 className="
-                    grid w-full mx-auto px-6 sm:px-8 lg:px-12
-                    grid-cols-1
-                    min-[480px]:grid-cols-2
+                    grid w-full lg:w-[80vw] mx-auto px-4 sm:px-6 md:px-8
+                    grid-cols-2
                     sm:grid-cols-3
                     md:grid-cols-4
                     lg:grid-cols-6
                 "
                 style={{
-                    gap: 'clamp(1rem, 2.5vw, 2.5rem)',
-                    maxWidth: '1100px',
+                    gap: 'clamp(1rem, 1.8vw, 2.25rem)',
+                    maxWidth: '1600px',
                 }}
             >
                 {categories.map((category) => {
@@ -105,8 +103,8 @@ const ShopByCategorySection = () => {
 
                             {/* Category Name */}
                             <p
-                                className="font-medium text-gray-900 uppercase tracking-wider text-center"
-                                style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)' }}
+                                className="font-medium text-gray-900 uppercase tracking-wider text-center mt-1.5"
+                                style={{ fontSize: 'clamp(0.68rem, 1.4vw, 0.875rem)' }}
                             >
                                 {category.name}
                             </p>

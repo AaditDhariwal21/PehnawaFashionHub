@@ -43,8 +43,8 @@ const Footer = () => {
                 style={{
                     maxWidth: '1200px',
                     margin: '0 auto',
-                    padding: 'clamp(2rem, 4vw, 3.5rem) clamp(1.25rem, 4vw, 2rem) clamp(1.5rem, 3vw, 2.5rem)',
-                    gap: 'clamp(2rem, 3vw, 3rem)',
+                    padding: 'clamp(1.5rem, 3.5vw, 3.5rem) clamp(1rem, 3vw, 2rem) clamp(1.25rem, 2.5vw, 2.5rem)',
+                    gap: 'clamp(1.5rem, 2.5vw, 3rem)',
                 }}
             >
                 {/* Quick Links */}
@@ -112,22 +112,19 @@ const Footer = () => {
             {/* Bottom bar */}
             <div style={{ borderTop: '1px solid #e5e7eb' }}>
                 <div
+                    className="flex flex-col items-center sm:flex-row sm:justify-between"
                     style={{
                         maxWidth: '1200px',
                         margin: '0 auto',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        flexWrap: 'wrap',
-                        gap: '0.5rem',
-                        padding: '1.25rem clamp(1.25rem, 4vw, 2rem)',
+                        gap: '0.35rem',
+                        padding: '1rem clamp(1.25rem, 4vw, 2rem)',
                     }}
                 >
-                    <p style={{ fontSize: '0.8rem', color: '#6b7280', margin: 0 }}>
+                    <p style={{ fontSize: '0.78rem', color: '#6b7280', margin: 0 }}>
                         © <span style={{ color: '#EFBF04', fontWeight: 600 }}>Pehnawa</span> 2026
                     </p>
-                    <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                        🇺🇸 United States (USD $)
+                    <span style={{ fontSize: '0.78rem', color: '#6b7280' }}>
+                        United States (USD $)
                     </span>
                 </div>
             </div>
