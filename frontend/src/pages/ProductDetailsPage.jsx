@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Heart, Ruler } from 'lucide-react';
+import { ChevronLeft, Heart, Ruler, ChevronDown } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import { useCompare } from '../context/CompareContext';
 import formatPrice from '../utils/formatPrice';
 import {
     colorsWithVariants,
@@ -29,6 +30,7 @@ const ProductDetailsPage = () => {
     const navigate = useNavigate();
     const { addToCart, openCart, setBuyNowItem } = useCart();
     const { isWishlisted, toggleWishlist } = useWishlist();
+    const { compareCount } = useCompare();
 
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -37,6 +39,9 @@ const ProductDetailsPage = () => {
     const [selectedSize, setSelectedSize] = useState(null);
     const [selectedColor, setSelectedColor] = useState(null);
     const [sizeChartOpen, setSizeChartOpen] = useState(false);
+    const [descOpen, setDescOpen] = useState(false);          // Product Details accordion (mobile)
+    const [stickyVisible, setStickyVisible] = useState(false); // mobile sticky Add-to-Cart bar
+    const inlineCtaRef = useRef(null);
 
     useEffect(() => {
         const fetchProduct = async () => {
@@ -82,6 +87,19 @@ const ProductDetailsPage = () => {
             setSelectedSize(null);
         }
     }, [product, selectedColor, selectedSize]);
+
+    // Sticky mobile Add-to-Cart bar: show it only while the inline action
+    // buttons are scrolled out of view (avoids a duplicate CTA on screen).
+    useEffect(() => {
+        const el = inlineCtaRef.current;
+        if (!el) return;
+        const obs = new IntersectionObserver(
+            ([entry]) => setStickyVisible(!entry.isIntersecting),
+            { rootMargin: '0px 0px -96px 0px' }
+        );
+        obs.observe(el);
+        return () => obs.disconnect();
+    }, [product]);
 
     /* ───────────────── Loading State ───────────────── */
     if (loading) {
@@ -132,6 +150,12 @@ const ProductDetailsPage = () => {
     const sizes = allSizes(product);
     const sizeChart = getSizeChart(product.category);
 
+    // The rich-text editor stores non-breaking spaces (&nbsp;/U+00A0) between
+    // words, which the browser never line-breaks — long phrases then overflow
+    // their column on narrow screens. Normalise them to regular spaces so the
+    // description wraps naturally on mobile.
+    const descHtml = (product.description || '').replace(/&nbsp;/gi, ' ').replace(/\u00a0/g, ' ');
+
     const isPurchasable = selectedVariant && selectedVariant.stock > 0;
 
     const handleBuyNow = () => {
@@ -172,7 +196,7 @@ const ProductDetailsPage = () => {
 
     /* ───────────────── Product Page ───────────────── */
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-white pb-18 md:pb-0">
             <Navbar />
 
             {/* Breadcrumb */}
@@ -241,14 +265,16 @@ const ProductDetailsPage = () => {
                     </div>
 
                     {/* ═══════════ RIGHT — Product Details ═══════════ */}
-                    <div className="w-full md:flex-1">
+                    {/* min-w-0 lets this flex column shrink to its share instead of
+                        being blown out by long unbreakable strings in the description. */}
+                    <div className="w-full md:flex-1 min-w-0">
                         {/* Category */}
                         <p className="uppercase tracking-widest font-semibold" style={{ fontSize: '0.7rem', color: '#EFBF04', letterSpacing: '0.15em', marginBottom: '0.5rem' }}>
                             {displayCategory(product.category)}
                         </p>
 
                         {/* Product Name */}
-                        <h1 className="font-bold text-gray-900 leading-tight" style={{ fontSize: '1.85rem', marginBottom: '0.5rem' }}>
+                        <h1 className="font-bold text-gray-900 leading-tight text-[1.35rem] md:text-[1.85rem]" style={{ marginBottom: '0.5rem' }}>
                             {product.name}
                         </h1>
 
@@ -360,7 +386,7 @@ const ProductDetailsPage = () => {
                                         <button
                                             type="button"
                                             onClick={() => setSizeChartOpen(true)}
-                                            className="flex items-center gap-1.5 cursor-pointer transition-colors"
+                                            className="flex items-center gap-1.5 cursor-pointer transition-colors min-h-11 md:min-h-0"
                                             style={{
                                                 background: 'none',
                                                 border: 'none',
@@ -413,7 +439,7 @@ const ProductDetailsPage = () => {
                         )}
 
                         {/* Action Buttons */}
-                        <div className="flex flex-col gap-3" style={{ marginBottom: '2rem' }}>
+                        <div ref={inlineCtaRef} className="flex flex-col gap-3" style={{ marginBottom: '2rem' }}>
                             <button
                                 onClick={handleBuyNow}
                                 disabled={!isPurchasable}
@@ -464,15 +490,26 @@ const ProductDetailsPage = () => {
 
                         <hr className="border-gray-100" style={{ marginBottom: '1.5rem' }} />
 
-                        {/* Description */}
+                        {/* Description — collapsible on mobile, always open on desktop */}
                         <div>
-                            <p className="font-bold text-gray-900 uppercase tracking-wide" style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-                                Product Details
-                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setDescOpen((v) => !v)}
+                                aria-expanded={descOpen}
+                                className="w-full flex items-center justify-between bg-transparent border-none p-0 text-left cursor-pointer min-h-11 md:min-h-0 md:cursor-default md:pointer-events-none"
+                            >
+                                <span className="font-bold text-gray-900 uppercase tracking-wide" style={{ fontSize: '0.85rem' }}>
+                                    Product Details
+                                </span>
+                                <ChevronDown
+                                    className="w-4 h-4 text-gray-400 md:hidden transition-transform duration-200"
+                                    style={{ transform: descOpen ? 'rotate(180deg)' : 'rotate(0)' }}
+                                />
+                            </button>
                             <div
-                                className="product-description text-gray-600 leading-relaxed"
-                                style={{ fontSize: '0.9rem', lineHeight: '1.75' }}
-                                dangerouslySetInnerHTML={{ __html: product.description }}
+                                className={`product-description text-gray-600 leading-relaxed ${descOpen ? 'block' : 'hidden'} md:block`}
+                                style={{ fontSize: '0.9rem', lineHeight: '1.75', marginTop: '0.75rem', overflowWrap: 'break-word' }}
+                                dangerouslySetInnerHTML={{ __html: descHtml }}
                             />
                         </div>
                     </div>
@@ -490,6 +527,48 @@ const ProductDetailsPage = () => {
                 onClose={() => setSizeChartOpen(false)}
                 chart={sizeChart}
             />
+
+            {/* ═══ Sticky mobile Add-to-Cart bar ═══
+                Phones only. Sits just above the bottom nav; when the compare
+                bar is also showing it floats above that (≈4.75rem) so they
+                don't overlap. Hidden while the inline CTAs are on screen. */}
+            <div
+                className="md:hidden fixed left-0 right-0 bg-white border-t border-gray-200 flex items-center gap-3"
+                style={{
+                    bottom: compareCount > 0
+                        ? 'calc(var(--pw-bottom-nav-h) + var(--pw-safe-bottom) + 4.75rem)'
+                        : 'calc(var(--pw-bottom-nav-h) + var(--pw-safe-bottom))',
+                    zIndex: 'var(--pw-z-fab)',
+                    padding: '0.6rem 1rem',
+                    boxShadow: '0 -4px 20px rgba(0,0,0,0.08)',
+                    transform: stickyVisible ? 'translateY(0)' : 'translateY(130%)',
+                    opacity: stickyVisible ? 1 : 0,
+                    pointerEvents: stickyVisible ? 'auto' : 'none',
+                    transition: 'transform 0.25s ease, opacity 0.25s ease',
+                }}
+            >
+                <div className="flex flex-col flex-shrink-0">
+                    <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', lineHeight: 1.15 }}>
+                        {formatPrice(effectivePrice)}
+                    </span>
+                    {!selectedSize && (
+                        <span style={{ fontSize: '0.65rem', color: '#9ca3af', lineHeight: 1.1 }}>Select size</span>
+                    )}
+                </div>
+                <button
+                    onClick={handleAddToCart}
+                    className="flex-1 font-bold uppercase text-white rounded-lg active:scale-[0.98] transition-transform cursor-pointer"
+                    style={{
+                        padding: '0.85rem',
+                        fontSize: '0.85rem',
+                        letterSpacing: '0.06em',
+                        border: 'none',
+                        background: 'linear-gradient(135deg, #EFBF04, #d4a904)',
+                    }}
+                >
+                    Add to Cart
+                </button>
+            </div>
         </div>
     );
 };

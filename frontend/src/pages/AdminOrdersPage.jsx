@@ -57,17 +57,17 @@ const AdminOrdersPage = () => {
                 className="sticky top-0 z-40 w-full"
                 style={{ backgroundColor: '#FFFFFF', borderBottom: '2px solid #FAD76C', boxShadow: '0 4px 20px rgba(250,215,108,0.3)' }}
             >
-                <div className="w-full flex items-center justify-between" style={{ padding: '1.25rem 2.5rem' }}>
-                    <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full border-2 flex items-center justify-center" style={{ borderColor: '#EFBF04' }}>
+                <div className="w-full flex items-center justify-between gap-3 px-4 py-3.5 md:px-10 md:py-5">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-12 h-12 rounded-full border-2 flex items-center justify-center shrink-0" style={{ borderColor: '#EFBF04' }}>
                             <span className="font-serif text-xl italic" style={{ color: '#EFBF04' }}>P</span>
                         </div>
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-900">All Orders</h1>
+                        <div className="min-w-0">
+                            <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">All Orders</h1>
                             <p className="text-sm text-gray-500">Pehnawa</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-5">
+                    <div className="flex items-center gap-2 md:gap-5 shrink-0">
                         <button
                             onClick={() => navigate('/adminDashboard')}
                             className="text-sm font-medium cursor-pointer rounded-md"
@@ -75,7 +75,7 @@ const AdminOrdersPage = () => {
                             onMouseEnter={(e) => { e.target.style.borderColor = '#EFBF04'; e.target.style.color = '#EFBF04'; }}
                             onMouseLeave={(e) => { e.target.style.borderColor = '#e5e7eb'; e.target.style.color = '#6b7280'; }}
                         >
-                            ← Dashboard
+                            ←<span className="hidden sm:inline"> Dashboard</span>
                         </button>
                         <button
                             onClick={handleLogout}
@@ -91,7 +91,7 @@ const AdminOrdersPage = () => {
             </header>
 
             {/* ── Content ── */}
-            <main style={{ padding: '2.5rem 3rem' }}>
+            <main className="px-4 py-6 md:px-12 md:py-10">
                 <h2 className="text-2xl font-bold text-gray-900 mb-1">
                     Manage <span style={{ color: '#EFBF04' }}>Orders</span>
                 </h2>
@@ -105,8 +105,8 @@ const AdminOrdersPage = () => {
                         <p style={{ fontSize: '0.9rem' }}>Orders placed by customers will appear here.</p>
                     </div>
                 ) : (
-                    <div style={{ backgroundColor: '#fff', borderRadius: '1rem', border: '2px solid #FAD76C', overflow: 'hidden', boxShadow: '0 2px 12px rgba(250,215,108,0.15)' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <div style={{ backgroundColor: '#fff', borderRadius: '1rem', border: '2px solid #FAD76C', overflowX: 'auto', boxShadow: '0 2px 12px rgba(250,215,108,0.15)' }}>
+                        <table style={{ width: '100%', minWidth: '640px', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ backgroundColor: '#fffbeb', borderBottom: '1px solid #fde68a' }}>
                                     <th style={thStyle}>Order ID</th>

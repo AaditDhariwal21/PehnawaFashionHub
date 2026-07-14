@@ -154,7 +154,8 @@ const RelatedProducts = ({ currentProduct }) => {
                                     {/* Wishlist heart (top-right) */}
                                     <button
                                         onClick={(e) => { e.stopPropagation(); toggleWishlist(product._id); }}
-                                        className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
+                                        aria-label="Add to wishlist"
+                                        className="absolute top-2.5 right-2.5 w-11 h-11 sm:w-7 sm:h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
                                     >
                                         <Heart
                                             className="w-3.5 h-3.5 transition-colors"
@@ -178,7 +179,7 @@ const RelatedProducts = ({ currentProduct }) => {
                                                 category: product.category,
                                             });
                                         }}
-                                        className="absolute bottom-2.5 left-2.5 w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
+                                        className="absolute bottom-2.5 left-2.5 w-11 h-11 sm:w-7 sm:h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
                                         title={isInCompare(product._id) ? 'Remove from compare' : 'Add to compare'}
                                     >
                                         <Scale

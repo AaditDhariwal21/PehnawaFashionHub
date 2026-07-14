@@ -146,7 +146,7 @@ const ComparePage = () => {
             <Navbar />
 
             {/* Breadcrumb */}
-            <div className="border-b border-gray-100" style={{ padding: '0.75rem 2rem' }}>
+            <div className="border-b border-gray-100" style={{ padding: '0.75rem clamp(1rem, 4vw, 2rem)' }}>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                     <button
                         onClick={() => navigate('/')}
@@ -160,10 +160,10 @@ const ComparePage = () => {
             </div>
 
             {/* Header */}
-            <div style={{ padding: '2rem 2rem 1rem' }}>
+            <div style={{ padding: 'clamp(1.25rem, 4vw, 2rem) clamp(1rem, 4vw, 2rem) 1rem' }}>
                 <div className="flex items-baseline justify-between flex-wrap gap-2">
                     <div>
-                        <h1 className="font-bold text-gray-900" style={{ fontSize: '2rem' }}>
+                        <h1 className="font-bold text-gray-900" style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)' }}>
                             Compare Products
                         </h1>
                         <p className="text-gray-500 text-sm" style={{ marginTop: '0.4rem' }}>

@@ -1,7 +1,7 @@
 .search-overlay {
     position: fixed;
     inset: 0;
-    z-index: 100;
+    z-index: var(--pw-z-search, 600);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -282,7 +282,8 @@
 
     .search-overlay__input {
         height: 3rem;
-        font-size: 0.95rem;
+        /* 16px floor prevents iOS Safari auto-zoom on focus */
+        font-size: 16px;
     }
 
     .search-overlay__dropdown-item {

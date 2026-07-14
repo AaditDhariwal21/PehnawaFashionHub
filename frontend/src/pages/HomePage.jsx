@@ -1,5 +1,6 @@
 import Navbar from '../components/Navbar';
 import NewArrivalsSection from '../components/NewArrivalsSection';
+import BestsellersSection from '../components/BestsellersSection';
 import ShopByCategorySection from '../components/ShopByCategorySection';
 import Footer from '../components/Footer';
 
@@ -19,6 +20,7 @@ const HomePage = () => {
             </section>
 
             <NewArrivalsSection />
+            <BestsellersSection />
             <ShopByCategorySection />
             <Footer />
         </div>

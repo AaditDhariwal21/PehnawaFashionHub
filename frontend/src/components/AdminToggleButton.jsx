@@ -34,11 +34,11 @@ const AdminToggleButton = () => {
                 onMouseEnter={() => setHovered(true)}
                 onMouseLeave={() => setHovered(false)}
                 aria-label={label}
+                className="pw-admin-fab"
                 style={{
                     position: 'fixed',
-                    bottom: '20px',
                     right: '20px',
-                    zIndex: 9999,
+                    zIndex: 'var(--pw-z-fab)',
                     width: '54px',
                     height: '54px',
                     borderRadius: '50%',
@@ -98,7 +98,7 @@ const AdminToggleButton = () => {
                     position: 'fixed',
                     bottom: '28px',
                     right: '82px',
-                    zIndex: 9999,
+                    zIndex: 'var(--pw-z-fab)',
                     backgroundColor: '#1f2937',
                     color: '#fff',
                     fontSize: '0.75rem',

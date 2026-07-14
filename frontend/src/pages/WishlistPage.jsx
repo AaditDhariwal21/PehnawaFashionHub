@@ -247,7 +247,7 @@ const WishlistPage = () => {
                                             {/* Remove button */}
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handleRemove(product._id); }}
-                                                className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:bg-red-50 hover:scale-110"
+                                                className="absolute top-3 right-3 w-10 h-10 md:w-8 md:h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:bg-red-50 hover:scale-110"
                                                 title="Remove from wishlist"
                                             >
                                                 <X className="w-4 h-4 text-gray-400 hover:text-red-500 transition-colors" strokeWidth={2} />
@@ -328,7 +328,7 @@ const WishlistPage = () => {
                                             <button
                                                 onClick={() => handleAddToCart(product)}
                                                 disabled={outOfStock}
-                                                className="w-full flex items-center justify-center gap-2 font-semibold rounded-lg cursor-pointer border-none transition-all active:scale-[0.98]"
+                                                className="w-full min-h-11 md:min-h-0 flex items-center justify-center gap-2 font-semibold rounded-lg cursor-pointer border-none transition-all active:scale-[0.98]"
                                                 style={{
                                                     marginTop: '0.85rem',
                                                     padding: '0.65rem 1rem',

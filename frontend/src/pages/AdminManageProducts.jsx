@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import ReactQuill from 'react-quill-new';
@@ -253,7 +253,7 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
     const labelCls = 'block text-xs font-medium text-gray-500 mb-1.5';
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)' }} onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)' }} onClick={(e) => e.target === e.currentTarget && onClose()}>
             <div className="relative w-full max-h-[92vh] overflow-hidden flex flex-col" style={{ maxWidth: '1100px', backgroundColor: '#fff', borderRadius: '16px', boxShadow: '0 24px 48px -12px rgba(0,0,0,0.18)' }}>
                 {/* Header */}
                 <div className="flex items-center justify-between shrink-0" style={{ padding: '18px 28px', borderBottom: '1px solid #e5e7eb' }}>
@@ -329,11 +329,11 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
                 </div>
 
                 {/* Footer */}
-                <div className="shrink-0 flex items-center" style={{ padding: '16px 28px', borderTop: '1px solid #e5e7eb', gap: '12px' }}>
-                    <button type="button" onClick={handleDelete} disabled={isLoading} className="px-5 text-sm font-medium rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer" style={{ height: '44px' }}>Delete</button>
+                <div className="shrink-0 flex items-center gap-2 md:gap-3 px-4 py-3.5 md:px-7 md:py-4" style={{ borderTop: '1px solid #e5e7eb' }}>
+                    <button type="button" onClick={handleDelete} disabled={isLoading} className="px-3 md:px-5 text-sm font-medium rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors cursor-pointer" style={{ height: '44px' }}>Delete</button>
                     <div className="flex-1" />
-                    <button type="button" onClick={onClose} className="px-5 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" style={{ height: '44px' }}>Cancel</button>
-                    <button type="button" onClick={handleSave} disabled={isLoading} className={`px-6 text-sm font-semibold text-white rounded-lg transition-all cursor-pointer ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'}`} style={{ backgroundColor: '#EFBF04', height: '44px', minWidth: '130px' }}>
+                    <button type="button" onClick={onClose} className="px-3 md:px-5 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" style={{ height: '44px' }}>Cancel</button>
+                    <button type="button" onClick={handleSave} disabled={isLoading} className={`px-3 md:px-6 min-w-0 md:min-w-[130px] whitespace-nowrap text-sm font-semibold text-white rounded-lg transition-all cursor-pointer ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'}`} style={{ backgroundColor: '#EFBF04', height: '44px' }}>
                         {isLoading ? <span className="flex items-center justify-center gap-2"><svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>Saving...</span> : 'Save Changes'}
                     </button>
                 </div>
@@ -458,22 +458,22 @@ const AdminManageProducts = () => {
         <div className="min-h-screen" style={{ backgroundColor: '#F5F5F5' }}>
             {/* ── Header ── */}
             <header className="sticky top-0 z-40 w-full" style={{ backgroundColor: '#FFFFFF', borderBottom: '2px solid #FAD76C', boxShadow: '0 4px 20px rgba(250,215,108,0.3)' }}>
-                <div className="w-full flex items-center justify-between" style={{ padding: '1.25rem 2.5rem' }}>
-                    <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full border-2 flex items-center justify-center" style={{ borderColor: '#EFBF04' }}>
+                <div className="w-full flex items-center justify-between gap-3 px-4 py-3.5 md:px-10 md:py-5">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-12 h-12 rounded-full border-2 flex items-center justify-center shrink-0" style={{ borderColor: '#EFBF04' }}>
                             <span className="font-serif text-xl italic" style={{ color: '#EFBF04' }}>P</span>
                         </div>
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-900">Manage Products</h1>
+                        <div className="min-w-0">
+                            <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">Manage Products</h1>
                             <p className="text-sm text-gray-500">Pehnawa</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-5">
+                    <div className="flex items-center gap-2 md:gap-5 shrink-0">
                         <button onClick={() => navigate('/adminDashboard')} className="text-sm font-medium cursor-pointer rounded-md"
                             style={{ padding: '10px 16px', border: '1.5px solid #e5e7eb', color: '#6b7280', backgroundColor: 'transparent' }}
                             onMouseEnter={(e) => { e.target.style.borderColor = '#EFBF04'; e.target.style.color = '#EFBF04'; }}
                             onMouseLeave={(e) => { e.target.style.borderColor = '#e5e7eb'; e.target.style.color = '#6b7280'; }}>
-                            &larr; Dashboard
+                            &larr;<span className="hidden sm:inline"> Dashboard</span>
                         </button>
                         <button onClick={handleLogout} className="text-sm font-medium transition-all cursor-pointer rounded-md"
                             style={{ padding: '10px 16px', border: '1.5px solid #EFBF04', color: '#EFBF04', backgroundColor: 'transparent' }}
@@ -486,7 +486,7 @@ const AdminManageProducts = () => {
             </header>
 
             {/* ── Main ── */}
-            <main style={{ padding: '2.5rem 3rem' }}>
+            <main className="px-4 py-6 md:px-12 md:py-10">
                 <h2 className="text-2xl font-bold text-gray-900 mb-1">
                     Manage <span style={{ color: '#EFBF04' }}>Products</span>
                 </h2>
@@ -572,59 +572,102 @@ const AdminManageProducts = () => {
                                 : null;
 
                             return (
-                                <div
-                                    key={product._id}
-                                    className="flex flex-col md:grid items-center transition-colors hover:bg-amber-50/40"
-                                    style={{
-                                        gridTemplateColumns: '40px 56px 1fr 140px 100px 80px 100px',
-                                        padding: '10px 20px',
-                                        minHeight: '68px',
-                                        borderBottom: index < filtered.length - 1 ? '1px solid #F3F4F6' : 'none',
-                                        backgroundColor: isSelected ? 'rgba(239,191,4,0.06)' : 'transparent',
-                                    }}
-                                >
-                                    <span className="flex items-center justify-center">
+                                <Fragment key={product._id}>
+                                    {/* Desktop grid row */}
+                                    <div
+                                        className="hidden md:grid md:items-center transition-colors hover:bg-amber-50/40"
+                                        style={{
+                                            gridTemplateColumns: '40px 56px 1fr 140px 100px 80px 100px',
+                                            padding: '10px 20px',
+                                            minHeight: '68px',
+                                            borderBottom: index < filtered.length - 1 ? '1px solid #F3F4F6' : 'none',
+                                            backgroundColor: isSelected ? 'rgba(239,191,4,0.06)' : 'transparent',
+                                        }}
+                                    >
+                                        <span className="flex items-center justify-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => toggleSelect(product._id)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="w-4 h-4 accent-amber-500 cursor-pointer"
+                                            />
+                                        </span>
+
+                                        <div className="w-11 h-11 rounded-md overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center cursor-pointer" onClick={() => setEditProduct(product)}>
+                                            {thumb ? (
+                                                <img src={thumb} alt={product?.name || "Product Image"} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                            )}
+                                        </div>
+
+                                        <p className="text-sm font-medium text-gray-900 truncate cursor-pointer" onClick={() => setEditProduct(product)}>{product.name}</p>
+
+                                        <span className="text-sm text-gray-500">{displayCategory(product.category)}{product.subCategory ? ` / ${product.subCategory}` : ''}</span>
+
+                                        <span className="text-sm font-semibold text-gray-800 text-right">{formatPrice(product.price)}</span>
+
+                                        <span className="text-sm text-gray-600 text-center relative group" title={breakdown || ''}>
+                                            {stock}
+                                            {breakdown && (
+                                                <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs text-white bg-gray-800 rounded whitespace-nowrap z-10">
+                                                    {breakdown}
+                                                </span>
+                                            )}
+                                        </span>
+
+                                        <div className="flex justify-center">
+                                            <span className="inline-block text-xs font-medium rounded-full"
+                                                style={{ padding: '3px 10px', backgroundColor: inStock ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: inStock ? '#16a34a' : '#dc2626' }}>
+                                                {inStock ? 'In Stock' : 'Out of Stock'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Mobile card */}
+                                    <div
+                                        className="md:hidden flex items-center gap-3"
+                                        style={{
+                                            padding: '12px 16px',
+                                            borderBottom: index < filtered.length - 1 ? '1px solid #F3F4F6' : 'none',
+                                            backgroundColor: isSelected ? 'rgba(239,191,4,0.06)' : 'transparent',
+                                        }}
+                                    >
                                         <input
                                             type="checkbox"
                                             checked={isSelected}
                                             onChange={() => toggleSelect(product._id)}
                                             onClick={(e) => e.stopPropagation()}
-                                            className="w-4 h-4 accent-amber-500 cursor-pointer"
+                                            className="w-5 h-5 accent-amber-500 cursor-pointer shrink-0"
                                         />
-                                    </span>
 
-                                    <div className="w-11 h-11 rounded-md overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center cursor-pointer" onClick={() => setEditProduct(product)}>
-                                        {thumb ? (
-                                            <img src={thumb} alt={product?.name || "Product Image"} className="w-full h-full object-cover" />
-                                        ) : (
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                        )}
+                                        <div className="w-14 h-14 rounded-md overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center cursor-pointer" onClick={() => setEditProduct(product)}>
+                                            {thumb ? (
+                                                <img src={thumb} alt={product?.name || "Product Image"} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                            )}
+                                        </div>
+
+                                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setEditProduct(product)}>
+                                            <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
+                                            <p className="text-xs text-gray-500 truncate mt-0.5">{displayCategory(product.category)}{product.subCategory ? ` / ${product.subCategory}` : ''}</p>
+                                            <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1 mt-1.5">
+                                                <span className="text-sm font-semibold text-gray-800">{formatPrice(product.price)}</span>
+                                                <span className="text-xs text-gray-400">Stock: {stock}</span>
+                                                <span className="inline-block text-xs font-medium rounded-full"
+                                                    style={{ padding: '3px 10px', backgroundColor: inStock ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: inStock ? '#16a34a' : '#dc2626' }}>
+                                                    {inStock ? 'In Stock' : 'Out of Stock'}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
-
-                                    <p className="text-sm font-medium text-gray-900 truncate cursor-pointer mt-2 md:mt-0" onClick={() => setEditProduct(product)}>{product.name}</p>
-
-                                    <span className="text-xs text-gray-500 md:text-sm">{displayCategory(product.category)}{product.subCategory ? ` / ${product.subCategory}` : ''}</span>
-
-                                    <span className="text-sm font-semibold text-gray-800 md:text-right">{formatPrice(product.price)}</span>
-
-                                    <span className="text-sm text-gray-600 md:text-center relative group" title={breakdown || ''}>
-                                        {stock}
-                                        {breakdown && (
-                                            <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs text-white bg-gray-800 rounded whitespace-nowrap z-10">
-                                                {breakdown}
-                                            </span>
-                                        )}
-                                    </span>
-
-                                    <div className="md:flex md:justify-center">
-                                        <span className="inline-block text-xs font-medium rounded-full"
-                                            style={{ padding: '3px 10px', backgroundColor: inStock ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: inStock ? '#16a34a' : '#dc2626' }}>
-                                            {inStock ? 'In Stock' : 'Out of Stock'}
-                                        </span>
-                                    </div>
-                                </div>
+                                </Fragment>
                             );
                         })}
                     </div>

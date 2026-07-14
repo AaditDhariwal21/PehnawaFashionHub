@@ -214,7 +214,11 @@
 /* ── Responsive ── */
 @media (max-width: 768px) {
     .odp-grid {
-        grid-template-columns: 1fr;
+        /* minmax(0,1fr) — not 1fr — so the nowrap item name can't floor the
+           track at its content width and blow the cards past the viewport
+           (which overflow-x:clip would then silently hide). Names ellipsize
+           and the totals/address stay on-screen instead. */
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .odp-header h1 {
@@ -223,5 +227,10 @@
 
     .odp-container {
         padding: 1.25rem 1rem 3rem;
+    }
+
+    /* Comfortable tap target for the back link on touch devices. */
+    .odp-back {
+        min-height: var(--pw-tap);
     }
 }

@@ -104,7 +104,7 @@ const CategoryProductsPage = () => {
             <Navbar />
 
             {/* Breadcrumb */}
-            <div className="border-b border-gray-100" style={{ padding: '0.75rem 2rem' }}>
+            <div className="border-b border-gray-100 py-3 px-4 sm:px-8">
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                     <button
                         onClick={() => navigate('/')}
@@ -119,8 +119,8 @@ const CategoryProductsPage = () => {
             </div>
 
             {/* Header */}
-            <div style={{ padding: '2.5rem 2rem 1rem' }}>
-                <h1 className="font-bold text-gray-900" style={{ fontSize: '2rem' }}>
+            <div className="pt-10 pb-4 px-4 sm:px-8">
+                <h1 className="font-bold text-gray-900 text-[1.4rem] sm:text-[2rem]">
                     {displayName}
                 </h1>
                 <p className="text-gray-500 text-sm" style={{ marginTop: '0.4rem' }}>
@@ -129,7 +129,7 @@ const CategoryProductsPage = () => {
             </div>
 
             {/* Product Grid */}
-            <div style={{ padding: '1.5rem 2rem 4rem' }}>
+            <div className="pt-6 pb-16 px-4 sm:px-8">
                 {products.length === 0 ? (
                     /* Empty state */
                     <div
@@ -148,13 +148,7 @@ const CategoryProductsPage = () => {
                         </p>
                     </div>
                 ) : (
-                    <div
-                        className="grid"
-                        style={{
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(16rem, 1fr))',
-                            gap: '2rem',
-                        }}
-                    >
+                    <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-3 sm:gap-8">
                         {products.map((product) => {
                             const imageUrl = product.images?.[0]?.url;
                             return (
@@ -186,7 +180,8 @@ const CategoryProductsPage = () => {
                                         {/* Wishlist heart */}
                                         <button
                                             onClick={(e) => { e.stopPropagation(); toggleWishlist(product._id); }}
-                                            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
+                                            aria-label="Add to wishlist"
+                                            className="absolute top-3 right-3 w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
                                         >
                                             <Heart
                                                 className="w-4 h-4 transition-colors"
@@ -223,7 +218,7 @@ const CategoryProductsPage = () => {
                                                     category: product.category,
                                                 });
                                             }}
-                                            className="absolute bottom-3 left-3 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
+                                            className="absolute bottom-3 left-3 w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
                                             title={isInCompare(product._id) ? 'Remove from compare' : 'Add to compare'}
                                         >
                                             <Scale

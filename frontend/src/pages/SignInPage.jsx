@@ -183,17 +183,14 @@ const SignInPage = () => {
     const signInReady = password.length >= 3;
 
     return (
-        <div className="w-full h-screen flex justify-center items-center" style={{ backgroundColor: '#F5F5F5' }}>
+        <div className="w-full min-h-screen flex justify-center items-center px-4 py-8 md:p-0" style={{ backgroundColor: '#F5F5F5' }}>
             {/* Sign In/Up Box */}
             <div
-                className="rounded-xl flex flex-col items-center justify-center"
+                className={`rounded-xl flex flex-col items-center justify-center w-full max-w-[30rem] px-6 py-8 md:px-[3.125rem] md:py-10 ${isSignUp ? 'md:h-[34rem]' : 'md:h-[32rem]'}`}
                 style={{
                     backgroundColor: '#FFFFFF',
                     border: '0.0625rem solid #FAD76C',
                     boxShadow: '0 0 1.25rem rgba(250, 215, 108, 0.5), 0 0 2.5rem rgba(250, 215, 108, 0.3)',
-                    padding: '2.5rem 3.125rem',
-                    width: '30rem',
-                    height: isSignUp ? '34rem' : '32rem'
                 }}
             >
                 {/* Initial Logo */}
@@ -215,7 +212,7 @@ const SignInPage = () => {
                             <>
                                 Click here to{' '}
                                 <span
-                                    className="cursor-pointer hover:text-blue-600 transition-colors"
+                                    className="cursor-pointer hover:text-blue-600 transition-colors inline-block py-1"
                                     onClick={() => { setIsSignUp(true); setError(''); }}
                                 >
                                     create an account
@@ -241,8 +238,8 @@ const SignInPage = () => {
                             placeholder="Full Name"
                             value={fullName}
                             onChange={(e) => setFullName(e.target.value)}
-                            style={{ height: '2.5rem', marginBottom: '1rem', paddingLeft: '1rem', paddingRight: '1rem' }}
-                            className="w-full bg-white border border-gray-200 rounded-md text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm"
+                            style={{ marginBottom: '1rem', paddingLeft: '1rem', paddingRight: '1rem' }}
+                            className="w-full h-11 md:h-10 bg-white border border-gray-200 rounded-md text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm"
                         />
                     )}
 
@@ -252,8 +249,8 @@ const SignInPage = () => {
                         placeholder="Email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        style={{ height: '2.5rem', marginBottom: '1rem', paddingLeft: '1rem', paddingRight: '1rem' }}
-                        className="w-full bg-white border border-gray-200 rounded-md text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm"
+                        style={{ marginBottom: '1rem', paddingLeft: '1rem', paddingRight: '1rem' }}
+                        className="w-full h-11 md:h-10 bg-white border border-gray-200 rounded-md text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm"
                     />
 
                     {/* Password Input */}
@@ -263,13 +260,13 @@ const SignInPage = () => {
                             placeholder="Password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            style={{ height: '2.5rem', paddingLeft: '1rem', paddingRight: '3rem' }}
-                            className="w-full bg-white border border-gray-200 rounded-md text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm"
+                            style={{ paddingLeft: '1rem', paddingRight: '3rem' }}
+                            className="w-full h-11 md:h-10 bg-white border border-gray-200 rounded-md text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm"
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                            className="absolute right-2 md:right-3 top-1/2 -translate-y-1/2 h-11 w-11 md:h-auto md:w-auto flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
                         >
                             {showPassword ? (
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -292,13 +289,13 @@ const SignInPage = () => {
                                 placeholder="Confirm Password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
-                                style={{ height: '2.5rem', paddingLeft: '1rem', paddingRight: '3rem' }}
-                                className="w-full bg-white border border-gray-200 rounded-md text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm"
+                                style={{ paddingLeft: '1rem', paddingRight: '3rem' }}
+                                className="w-full h-11 md:h-10 bg-white border border-gray-200 rounded-md text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-sm"
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                className="absolute right-2 md:right-3 top-1/2 -translate-y-1/2 h-11 w-11 md:h-auto md:w-auto flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
                             >
                                 {showConfirmPassword ? (
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -319,10 +316,9 @@ const SignInPage = () => {
                         type="submit"
                         disabled={isLoading}
                         style={{
-                            height: '2.5rem',
                             backgroundColor: (isSignUp ? passwordsMatch : signInReady) ? '#EFBF04' : undefined
                         }}
-                        className={`w-full rounded-md font-bold transition-all text-base cursor-pointer ${(isSignUp ? passwordsMatch : signInReady)
+                        className={`w-full h-11 md:h-10 rounded-md font-bold transition-all text-base cursor-pointer ${(isSignUp ? passwordsMatch : signInReady)
                             ? 'text-white hover:opacity-90'
                             : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                             } ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
@@ -335,7 +331,7 @@ const SignInPage = () => {
                         <p className="text-sm text-gray-500 text-center mt-4">
                             or click here to{' '}
                             <span
-                                className="cursor-pointer hover:text-blue-600 transition-colors"
+                                className="cursor-pointer hover:text-blue-600 transition-colors inline-block py-1"
                                 onClick={() => { setIsSignUp(false); setError(''); }}
                             >
                                 sign into your account
@@ -357,8 +353,8 @@ const SignInPage = () => {
                         <button
                             onClick={handleGoogleLogin}
                             disabled={isGoogleLoading}
-                            className={`w-full rounded-md text-gray-700 font-medium transition-all hover:opacity-90 cursor-pointer ${isGoogleLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-                            style={{ backgroundColor: '#ffcc00ff', height: '2.5rem' }}
+                            className={`w-full h-11 md:h-10 rounded-md text-gray-700 font-medium transition-all hover:opacity-90 cursor-pointer ${isGoogleLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            style={{ backgroundColor: '#ffcc00ff' }}
                         >
                             {isGoogleLoading ? 'Signing in...' : 'Sign in with Google'}
                         </button>

@@ -24,8 +24,8 @@ const SizeChartModal = ({ isOpen, onClose, chart }) => {
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)' }}
+            className="fixed inset-0 flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)', zIndex: 'var(--pw-z-search, 600)' }}
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div

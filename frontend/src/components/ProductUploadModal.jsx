@@ -173,7 +173,7 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-[500] flex items-center justify-center p-4"
             style={{ backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)' }}
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >

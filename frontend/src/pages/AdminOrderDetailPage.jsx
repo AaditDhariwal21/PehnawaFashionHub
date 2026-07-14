@@ -97,17 +97,17 @@ const AdminOrderDetailPage = () => {
                 className="sticky top-0 z-40 w-full"
                 style={{ backgroundColor: '#FFFFFF', borderBottom: '2px solid #FAD76C', boxShadow: '0 4px 20px rgba(250,215,108,0.3)' }}
             >
-                <div className="w-full flex items-center justify-between" style={{ padding: '1.25rem 2.5rem' }}>
-                    <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full border-2 flex items-center justify-center" style={{ borderColor: '#EFBF04' }}>
+                <div className="w-full flex items-center justify-between gap-3 px-4 py-3.5 md:px-10 md:py-5">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-12 h-12 rounded-full border-2 flex items-center justify-center shrink-0" style={{ borderColor: '#EFBF04' }}>
                             <span className="font-serif text-xl italic" style={{ color: '#EFBF04' }}>P</span>
                         </div>
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-900">Order Details</h1>
+                        <div className="min-w-0">
+                            <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">Order Details</h1>
                             <p className="text-sm text-gray-500">Pehnawa</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-5">
+                    <div className="flex items-center gap-2 md:gap-5 shrink-0">
                         <button
                             onClick={() => navigate('/admin/orders')}
                             className="text-sm font-medium cursor-pointer rounded-md"
@@ -115,7 +115,7 @@ const AdminOrderDetailPage = () => {
                             onMouseEnter={(e) => { e.target.style.borderColor = '#EFBF04'; e.target.style.color = '#EFBF04'; }}
                             onMouseLeave={(e) => { e.target.style.borderColor = '#e5e7eb'; e.target.style.color = '#6b7280'; }}
                         >
-                            ← All Orders
+                            ←<span className="hidden sm:inline"> All Orders</span>
                         </button>
                         <button
                             onClick={handleLogout}
@@ -131,7 +131,7 @@ const AdminOrderDetailPage = () => {
             </header>
 
             {/* ── Main ── */}
-            <main style={{ padding: '2.5rem 3rem', maxWidth: '1100px', margin: '0 auto' }}>
+            <main className="max-w-[1100px] mx-auto px-4 py-6 md:px-12 md:py-10">
                 {/* Order header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
                     <div>
@@ -152,7 +152,7 @@ const AdminOrderDetailPage = () => {
                     </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem' }}>
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_340px] gap-6">
                     {/* ── Left: Items + Totals ── */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                         {/* Items card */}
@@ -205,10 +205,11 @@ const AdminOrderDetailPage = () => {
                             <select
                                 value={newStatus}
                                 onChange={(e) => setNewStatus(e.target.value)}
+                                className="text-base md:text-[0.9rem]"
                                 style={{
                                     width: '100%', padding: '0.7rem 0.9rem',
                                     border: '1px solid #e5e7eb', borderRadius: '0.5rem',
-                                    fontSize: '0.9rem', fontFamily: 'inherit',
+                                    fontFamily: 'inherit',
                                     color: '#111827', background: '#fff',
                                     outline: 'none', cursor: 'pointer',
                                     marginBottom: '1rem',

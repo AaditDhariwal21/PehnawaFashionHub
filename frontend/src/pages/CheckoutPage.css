@@ -94,6 +94,9 @@
 
     .checkout-left {
         flex: 1 1 auto;
+        /* Stretch the form to the full view width (column flex + align-items:
+           flex-start would otherwise shrink it to its content). */
+        width: 100%;
     }
 
     .checkout-right {
@@ -105,6 +108,13 @@
     .checkout-row {
         flex-direction: column;
         gap: 0;
+    }
+
+    /* 16px floor so iOS Safari doesn't auto-zoom when a field is focused
+       (the class selector outranks the global input rule from index.css). */
+    .checkout-input,
+    .checkout-select {
+        font-size: 16px;
     }
 }
 

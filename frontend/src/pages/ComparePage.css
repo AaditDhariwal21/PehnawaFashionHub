@@ -166,16 +166,28 @@
 
 /* ── Responsive ── */
 @media (max-width: 640px) {
+    /* Drop the 600px floor so the table sizes to its columns — this lets two
+       product columns sit side-by-side (the 3rd peeks in as a swipe hint)
+       instead of only one being visible at a time. */
+    .compare-table {
+        min-width: 0;
+    }
+
     .compare-table th {
-        font-size: 0.7rem;
-        padding: 0.75rem 0.75rem;
-        min-width: 90px;
-        width: 90px;
+        font-size: 0.68rem;
+        padding: 0.7rem 0.5rem;
+        min-width: 70px;
+        width: 70px;
     }
 
     .compare-table td {
         font-size: 0.8rem;
-        padding: 0.75rem;
-        min-width: 160px;
+        padding: 0.7rem 0.6rem;
+        min-width: 130px;
+    }
+
+    /* Larger tap area for the per-product remove control on touch. */
+    .compare-table__remove-btn {
+        padding: 0.5rem 0.7rem;
     }
 }

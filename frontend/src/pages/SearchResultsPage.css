@@ -3,6 +3,13 @@
     background: #fff;
 }
 
+/* Results wrapper. On desktop it keeps the original padding (the grid adds
+   its own on top — unchanged). On mobile it drops to 0 so the grid's own
+   responsive padding controls the gutters and 2 columns fit. */
+.search-results__body {
+    padding: 1.5rem 2rem 4rem;
+}
+
 /* ── Breadcrumb ── */
 .search-results__breadcrumb {
     display: flex;
@@ -210,6 +217,10 @@
 
 /* ── Responsive ── */
 @media (max-width: 640px) {
+    .search-results__body {
+        padding: 0;
+    }
+
     .search-results__header {
         padding: 1.5rem 1rem 0.75rem;
     }
@@ -219,7 +230,12 @@
     }
 
     .search-results__grid {
-        grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+        /* fixed 2-up on phones so even 320px width shows two columns
+           (auto-fill/minmax(10rem) fell back to 1 column below ~375px).
+           minmax(0,1fr) — not plain 1fr — so the nowrap product name can't
+           force the track past the viewport (plain 1fr = minmax(auto,1fr),
+           whose min-content = full title width, blows the grid out). */
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 1rem;
         padding: 1rem;
     }

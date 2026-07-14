@@ -299,10 +299,10 @@ const CheckoutPage = () => {
             <Navbar />
 
             {/* Header */}
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 2rem 0' }}>
+            <div className="px-4 md:px-8 pt-8" style={{ maxWidth: '1200px', margin: '0 auto' }}>
                 <h1
+                    className="text-[1.5rem] md:text-[2rem]"
                     style={{
-                        fontSize: '2rem',
                         fontWeight: 700,
                         color: '#111827',
                         textAlign: 'center',
@@ -496,6 +496,7 @@ const CheckoutPage = () => {
                     {/* Back to cart link */}
                     <button
                         type="button"
+                        className="min-h-11 md:min-h-0"
                         onClick={() => {
                             if (isBuyNow) {
                                 clearBuyNowItem();

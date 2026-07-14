@@ -44,7 +44,10 @@ const ShopByCategorySection = () => {
                 paddingTop: 'clamp(1rem, 2vw, 1.75rem)',
                 paddingBottom: 'clamp(3.5rem, 7vw, 8rem)',
                 gap: 'clamp(1.25rem, 3vw, 3.5rem)',
-                background: 'linear-gradient(to bottom, #FAD76C 0%, #FAD76C 88%, #FFFFFF 100%)',
+                // White section of the alternating theme (the yellow now
+                // lives in the Bestsellers band above); flows into the
+                // white footer.
+                background: '#FFFFFF',
             }}
         >
             {/* Section Title */}
@@ -56,15 +59,20 @@ const ShopByCategorySection = () => {
             </h2>
 
             {/*
-                12 categories → equal rows at every breakpoint:
-                  default : 2 cols ×  6 rows
-                  ≥640px  : 3 cols ×  4 rows
-                  ≥768px  : 4 cols ×  3 rows
-                  ≥1024px : 6 cols ×  2 rows
+                Column counts are all divisors of the 12 categories, so
+                every row is completely full at every breakpoint — no
+                left-aligned remainder on a partial last row:
+                  default : 2 cols × 6 rows
+                  ≥640px  : 3 cols × 4 rows
+                  ≥768px  : 4 cols × 3 rows
+                  ≥1024px : 6 cols × 2 rows
+                Grid `1fr` tracks stretch the tiles to fill the row, and the
+                wide max-width keeps the tiles large without side gutters up
+                to ~1800px.
             */}
             <div
                 className="
-                    grid w-full lg:w-[80vw] mx-auto px-4 sm:px-6 md:px-8
+                    grid w-full mx-auto px-4 sm:px-6 md:px-10 lg:px-12
                     grid-cols-2
                     sm:grid-cols-3
                     md:grid-cols-4
@@ -72,7 +80,7 @@ const ShopByCategorySection = () => {
                 "
                 style={{
                     gap: 'clamp(1rem, 1.8vw, 2.25rem)',
-                    maxWidth: '1600px',
+                    maxWidth: '1800px',
                 }}
             >
                 {categories.map((category) => {

@@ -175,8 +175,10 @@ const AccountPage = () => {
                 <aside className="account-sidebar">
                     <div className="account-avatar">
                         <div className="account-avatar-circle">{getInitials()}</div>
-                        <p className="account-avatar-name">{user.name}</p>
-                        <p className="account-avatar-email">{user.email}</p>
+                        <div className="account-avatar-text">
+                            <p className="account-avatar-name">{user.name}</p>
+                            <p className="account-avatar-email">{user.email}</p>
+                        </div>
                     </div>
 
                     <nav className="account-nav">

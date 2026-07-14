@@ -24,9 +24,11 @@ import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { CompareProvider } from './context/CompareContext';
+import { UIProvider } from './context/UIContext';
 import CartDrawer from './components/CartDrawer';
 import CompareBar from './components/CompareBar';
 import AdminToggleButton from './components/AdminToggleButton';
+import MobileBottomNav from './components/MobileBottomNav';
 import WishlistPage from './pages/WishlistPage';
 import ComparePage from './pages/ComparePage';
 
@@ -38,9 +40,11 @@ function App() {
         <CartProvider>
           <WishlistProvider>
           <CompareProvider>
+          <UIProvider>
           <CartDrawer />
           <CompareBar />
           <AdminToggleButton />
+          <MobileBottomNav />
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/signin" element={<SignInPage />} />
@@ -68,6 +72,7 @@ function App() {
             <Route path="/shipping-policy" element={<ShippingPolicyPage />} />
             <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           </Routes>
+          </UIProvider>
           </CompareProvider>
           </WishlistProvider>
         </CartProvider>

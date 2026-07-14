@@ -1,13 +1,19 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Scale, Trash2 } from 'lucide-react';
 import { useCompare } from '../context/CompareContext';
 
 const CompareBar = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { compareItems, compareCount, limitReached, removeFromCompare, clearCompare, MAX_COMPARE } = useCompare();
 
     // Don't render if nothing to compare
     if (compareCount === 0) return null;
+
+    // Redundant on the Compare page itself (its "Compare Now" points here and
+    // its remove/clear duplicate the page's own controls) — and it overlaps
+    // the table on mobile. Hide it there; every other route is unaffected.
+    if (location.pathname === '/compare') return null;
 
     const emptySlots = MAX_COMPARE - compareCount;
 
@@ -22,7 +28,7 @@ const CompareBar = () => {
                         bottom: '7rem',
                         left: '50%',
                         transform: 'translateX(-50%)',
-                        zIndex: 1001,
+                        zIndex: 'var(--pw-z-compare-toast)',
                         backgroundColor: '#1f2937',
                         color: '#fff',
                         padding: '0.6rem 1.25rem',
@@ -38,14 +44,15 @@ const CompareBar = () => {
                 </div>
             )}
 
-            {/* Compare Bar */}
+            {/* Compare Bar — `bottom` is set in CSS (.pw-compare-bar) so it can
+                float above the mobile bottom nav when both are visible. */}
             <div
+                className="pw-compare-bar"
                 style={{
                     position: 'fixed',
-                    bottom: 0,
                     left: 0,
                     right: 0,
-                    zIndex: 1000,
+                    zIndex: 'var(--pw-z-compare)',
                     backgroundColor: '#fff',
                     borderTop: '1px solid #e5e7eb',
                     boxShadow: '0 -4px 24px rgba(0,0,0,0.08)',

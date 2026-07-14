@@ -269,7 +269,7 @@ const ColorImagesManager = ({ colors, onChange }) => {
                                                     <button
                                                         type="button"
                                                         onClick={() => removeImage(c.colorName, idx)}
-                                                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[0.55rem] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        className="absolute -top-1.5 -right-1.5 w-5 h-5 md:w-4 md:h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-xs md:text-[0.55rem] cursor-pointer opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                                                         title="Remove image"
                                                     >
                                                         ×

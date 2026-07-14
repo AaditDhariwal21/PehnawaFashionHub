@@ -262,13 +262,20 @@
         padding: 1.5rem 1rem 3rem;
     }
 
+    .ocp-success-title {
+        font-size: 1.35rem;
+    }
+
     .ocp-meta-row {
         flex-direction: column;
         gap: 0.75rem;
     }
 
     .ocp-grid {
-        grid-template-columns: 1fr;
+        /* minmax(0,1fr) — not 1fr — so the nowrap product name can't floor the
+           track at its min-content and blow the card past the viewport; the
+           name ellipsizes within the card instead. */
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .ocp-actions {

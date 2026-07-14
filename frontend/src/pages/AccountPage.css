@@ -68,6 +68,15 @@
     white-space: nowrap;
 }
 
+/* Wrapper that keeps name + email stacked as one unit. On desktop the avatar
+   is a centered block so this is inert; on mobile the avatar becomes a flex
+   row and this column takes the remaining width (min-width:0 lets the email
+   ellipsize instead of forcing the name to wrap). */
+.account-avatar-text {
+    flex: 1;
+    min-width: 0;
+}
+
 /* Nav items */
 .account-nav {
     display: flex;
@@ -497,6 +506,8 @@
     .account-nav-item {
         padding: 0.55rem 0.75rem;
         font-size: 0.85rem;
+        /* 44px tap target for the tab buttons. */
+        min-height: var(--pw-tap);
     }
 
     .account-nav-item.active {
@@ -514,5 +525,36 @@
 
     .account-field-row {
         grid-template-columns: 1fr;
+    }
+
+    /* 16px floor so iOS Safari doesn't auto-zoom on focus. The class selectors
+       (.account-field input / .account-select) outrank the global input rule
+       from index.css, so the floor has to be restated here. */
+    .account-field input,
+    .account-select {
+        font-size: 16px;
+    }
+
+    /* Order cards: let the status + action drop to their own full-width row
+       below the thumbnail/info so the order id and date stop wrapping in a
+       cramped 3-column strip. */
+    .account-order-card {
+        padding: 1rem 1.1rem;
+    }
+
+    .account-order-row {
+        flex-wrap: wrap;
+        gap: 0.85rem 1rem;
+    }
+
+    .account-order-actions {
+        flex-basis: 100%;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .account-order-view-btn {
+        min-height: var(--pw-tap);
     }
 }

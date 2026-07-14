@@ -29,14 +29,28 @@ app.use(morgan("dev"));
 
 /* ---------------- CORS ---------------- */
 
+// Explicit production origins.
+const PROD_ORIGINS = [
+    "https://pehnawafashionhub.vercel.app",
+    "https://pehnawa-fashion-hub.vercel.app", // if exists
+    "https://pehnawafashionhub.com",
+    "https://www.pehnawafashionhub.com",
+];
+
+// Allow ANY localhost / 127.0.0.1 port so local dev always connects no matter
+// which port Vite picks (5173, 5174, …). A browser cannot forge a localhost
+// Origin header, so this stays safe in production.
+const isLocalhostOrigin = (origin) =>
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
 app.use(cors({
-    origin: [
-        "http://localhost:5173",
-        "https://pehnawafashionhub.vercel.app",
-        "https://pehnawa-fashion-hub.vercel.app", // if exists
-        "https://pehnawafashionhub.com",
-        "https://www.pehnawafashionhub.com"
-    ],
+    origin(origin, callback) {
+        // No Origin = non-browser client (curl, server-to-server, health checks)
+        if (!origin || isLocalhostOrigin(origin) || PROD_ORIGINS.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error(`Not allowed by CORS: ${origin}`));
+    },
     credentials: true,
 }));
 

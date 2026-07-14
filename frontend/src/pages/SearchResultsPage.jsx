@@ -118,8 +118,10 @@ const SearchResultsPage = () => {
                 </p>
             </div>
 
-            {/* Results */}
-            <div style={{ padding: '1.5rem 2rem 4rem' }}>
+            {/* Results — padding lives on .search-results__body so it can drop
+                to 0 on mobile (the grid supplies its own responsive padding),
+                which restores the 2-column layout on phones. */}
+            <div className="search-results__body">
                 {products.length === 0 ? (
                     <div className="search-results__empty">
                         <div className="search-results__empty-icon">🔍</div>
@@ -150,7 +152,8 @@ const SearchResultsPage = () => {
                                         <div className="search-results__card-overlay" />
                                         <button
                                             onClick={(e) => { e.stopPropagation(); toggleWishlist(product._id); }}
-                                            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
+                                            aria-label="Add to wishlist"
+                                            className="absolute top-3 right-3 w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
                                             style={{ zIndex: 2 }}
                                         >
                                             <Heart
@@ -177,7 +180,7 @@ const SearchResultsPage = () => {
                                                     category: product.category,
                                                 });
                                             }}
-                                            className="absolute bottom-3 left-3 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
+                                            className="absolute bottom-3 left-3 w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
                                             style={{ zIndex: 2 }}
                                             title={isInCompare(product._id) ? 'Remove from compare' : 'Add to compare'}
                                         >

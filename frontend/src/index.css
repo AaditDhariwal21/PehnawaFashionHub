@@ -1,20 +1,126 @@
 @import "tailwindcss";
 
-/* Custom styles for Pehnawa */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+/* ══════════════════════════════════════════════════════════
+   Pehnawa — Global Design Tokens (Phase 0 foundation)
+   Single source of truth for brand, layout metrics, safe-area
+   insets, touch sizing and z-index layering.
+   ══════════════════════════════════════════════════════════ */
+:root {
+    /* Brand palette */
+    --pw-brand: #EFBF04;
+    --pw-brand-dark: #d4a904;
+    --pw-ink: #111827;
+    --pw-muted: #6b7280;
+
+    /* Layout metrics */
+    --pw-nav-h: 3.5rem;
+    /* mobile top nav (matches h-14) */
+    --pw-nav-h-lg: 4.75rem;
+    /* desktop top nav */
+    --pw-bottom-nav-h: 3.5rem;
+    /* mobile bottom nav */
+
+    /* Safe-area insets (0 on non-notched devices / desktop) */
+    --pw-safe-top: env(safe-area-inset-top, 0px);
+    --pw-safe-bottom: env(safe-area-inset-bottom, 0px);
+
+    /* Minimum comfortable touch target (~44px) */
+    --pw-tap: 2.75rem;
+
+    /* ── Z-index scale — higher sits closer to the user ── */
+    --pw-z-nav: 100;
+    /* sticky top nav + mobile bottom nav */
+    --pw-z-compare: 300;
+    /* compare bar */
+    --pw-z-compare-toast: 310;
+    --pw-z-fab: 350;
+    /* floating action button (admin toggle) — above compare, below modals */
+    --pw-z-menu-backdrop: 390;
+    --pw-z-menu: 400;
+    /* mobile category drawer */
+    --pw-z-cart-backdrop: 490;
+    --pw-z-cart: 500;
+    /* cart drawer */
+    --pw-z-search: 600;
+    /* full-screen search overlay */
+}
+
+/* Global reset.
+   IMPORTANT: this MUST stay inside `@layer base`. Tailwind v4 emits its
+   utilities in `@layer utilities`, and unlayered rules beat *any* layered
+   rule regardless of specificity. An unlayered `* { padding/margin: 0 }`
+   therefore silently overrides every `px-*`/`py-*`/`m-*` utility in the app.
+   Layering it as `base` keeps the reset but lets spacing utilities win. */
+@layer base {
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
 }
 
 html {
     scroll-behavior: smooth;
 }
 
+/* Horizontal-overflow safety net (mobile). `clip` is preferred because
+   — unlike `hidden` — it does not break `position: sticky` descendants;
+   `hidden` is kept as a fallback for browsers without `clip`.
+   True overflow sources are still fixed at the source per screen. */
+html,
+body {
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-x: clip;
+}
+
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Softer, less jarring tap flash on touch devices */
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.06);
+}
+
+/* iOS Safari auto-zooms when a focused field is under 16px. Enforce a
+   16px floor on phones so inputs never trigger the zoom-jump. Desktop
+   keeps its finer typographic sizing (rule only applies < md). */
+@media (max-width: 767.98px) {
+
+    input,
+    select,
+    textarea {
+        font-size: 16px;
+    }
+}
+
+/* Compare bar default position (overridden on mobile-with-bottom-nav below).
+   Kept in CSS — not inline — so the media query can lift it above the nav. */
+.pw-compare-bar {
+    bottom: 0;
+}
+
+/* Admin floating toggle default position (raised above the bottom nav on
+   mobile — see media query below). */
+.pw-admin-fab {
+    bottom: 20px;
+}
+
+/* When the mobile bottom nav is mounted it adds `.pw-has-bottom-nav` to
+   <body>; reserve space so page content / footer never hides behind it,
+   and float the compare bar just above the nav when both are visible. */
+@media (max-width: 767.98px) {
+    body.pw-has-bottom-nav {
+        padding-bottom: calc(var(--pw-bottom-nav-h) + var(--pw-safe-bottom));
+    }
+
+    body.pw-has-bottom-nav .pw-compare-bar {
+        bottom: calc(var(--pw-bottom-nav-h) + var(--pw-safe-bottom));
+    }
+
+    body.pw-has-bottom-nav .pw-admin-fab {
+        bottom: calc(20px + var(--pw-bottom-nav-h) + var(--pw-safe-bottom));
+    }
 }
 
 /* Custom scrollbar */

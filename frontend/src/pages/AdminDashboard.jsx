@@ -51,24 +51,24 @@ const AdminDashboard = () => {
                     boxShadow: '0 4px 20px rgba(250, 215, 108, 0.3)'
                 }}
             >
-                <div className="w-full flex items-center justify-between" style={{ padding: '1.25rem 2.5rem' }}>
+                <div className="w-full flex items-center justify-between gap-3 px-4 py-3.5 md:px-10 md:py-5">
                     {/* Logo */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                         <div
-                            className="w-12 h-12 rounded-full border-2 flex items-center justify-center"
+                            className="w-12 h-12 rounded-full border-2 flex items-center justify-center shrink-0"
                             style={{ borderColor: '#EFBF04' }}
                         >
                             <span className="font-serif text-xl italic" style={{ color: '#EFBF04' }}>P</span>
                         </div>
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-900">Admin Dashboard</h1>
+                        <div className="min-w-0">
+                            <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">Admin Dashboard</h1>
                             <p className="text-sm text-gray-500">Pehnawa</p>
                         </div>
                     </div>
 
                     {/* User Info & Logout */}
-                    <div className="flex items-center gap-5">
-                        <div className="text-right">
+                    <div className="flex items-center gap-2 md:gap-5 shrink-0">
+                        <div className="text-right hidden sm:block">
                             <p className="text-md font-medium text-gray-900">{user.name}</p>
                             <p className="text-sm text-gray-500">{user.email}</p>
                         </div>
@@ -97,7 +97,7 @@ const AdminDashboard = () => {
             </header>
 
             {/* Main Content */}
-            <main style={{ padding: '2.5rem 3rem' }}>
+            <main className="px-4 py-6 md:px-12 md:py-10">
                 {/* Success Message */}
                 {successMessage && (
                     <div

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 
+import useBodyScrollLock from '../utils/useBodyScrollLock';
 import './SearchOverlay.css';
 import { productUrl } from '../utils/productUrl.js';
 import { displayCategory } from '../utils/displayCategory.js';
@@ -44,15 +45,8 @@ const SearchOverlay = ({ isOpen, onClose }) => {
         return () => document.removeEventListener('keydown', handler);
     }, [isOpen, onClose]);
 
-    /* Lock body scroll */
-    useEffect(() => {
-        if (isOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
-        }
-        return () => { document.body.style.overflow = ''; };
-    }, [isOpen]);
+    /* Lock body scroll (shared, ref-counted) */
+    useBodyScrollLock(isOpen);
 
     /* Debounced live search */
     useEffect(() => {

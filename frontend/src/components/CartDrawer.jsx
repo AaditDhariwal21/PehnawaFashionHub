@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import formatPrice from '../utils/formatPrice';
+import useBodyScrollLock from '../utils/useBodyScrollLock';
 
 const CartDrawer = () => {
     const {
@@ -19,19 +20,17 @@ const CartDrawer = () => {
     const drawerRef = useRef(null);
     const navigate = useNavigate();
 
+    // Lock body scroll while the drawer is open (shared, ref-counted)
+    useBodyScrollLock(isCartOpen);
+
     // ESC key closes drawer
     useEffect(() => {
+        if (!isCartOpen) return;
         const handleEsc = (e) => {
             if (e.key === 'Escape') closeCart();
         };
-        if (isCartOpen) {
-            document.addEventListener('keydown', handleEsc);
-            document.body.style.overflow = 'hidden';
-        }
-        return () => {
-            document.removeEventListener('keydown', handleEsc);
-            document.body.style.overflow = '';
-        };
+        document.addEventListener('keydown', handleEsc);
+        return () => document.removeEventListener('keydown', handleEsc);
     }, [isCartOpen, closeCart]);
 
     const handleBackdropClick = (e) => {
@@ -49,7 +48,7 @@ const CartDrawer = () => {
                 style={{
                     position: 'fixed',
                     inset: 0,
-                    zIndex: 100,
+                    zIndex: 'var(--pw-z-cart-backdrop)',
                     backgroundColor: 'rgba(0, 0, 0, 0.35)',
                     backdropFilter: 'blur(4px)',
                     WebkitBackdropFilter: 'blur(4px)',
@@ -67,7 +66,7 @@ const CartDrawer = () => {
                     top: 0,
                     right: 0,
                     bottom: 0,
-                    zIndex: 101,
+                    zIndex: 'var(--pw-z-cart)',
                     width: 'min(400px, 100vw)',
                     backgroundColor: '#fff',
                     boxShadow: '-8px 0 30px rgba(0, 0, 0, 0.12)',
@@ -412,6 +411,7 @@ const CartDrawer = () => {
                     <div
                         style={{
                             padding: '1.25rem 1.5rem',
+                            paddingBottom: 'calc(1.25rem + var(--pw-safe-bottom))',
                             borderTop: '1px solid #e5e7eb',
                             backgroundColor: '#fff',
                         }}

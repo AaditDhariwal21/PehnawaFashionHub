@@ -5,6 +5,8 @@ import logo from '../assets/PehnawaLogoWhite.png';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
+import { useUI } from '../context/UIContext';
+import useBodyScrollLock from '../utils/useBodyScrollLock';
 import SearchOverlay from './SearchOverlay';
 
 /* ─── Category hierarchy ───
@@ -42,10 +44,11 @@ const Navbar = () => {
     const cartCount = getTotalQuantity();
     const { wishlistCount } = useWishlist();
 
+    const { mobileMenuOpen: mobileOpen, setMobileMenuOpen: setMobileOpen } = useUI();
+
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [showAccountMenu, setShowAccountMenu] = useState(false);
-    const [mobileOpen, setMobileOpen] = useState(false);
     const [expandedGroup, setExpandedGroup] = useState(null);
     const [hoveredGroup, setHoveredGroup] = useState(null);
     const hoverTimeout = useRef(null);
@@ -61,10 +64,7 @@ const Navbar = () => {
         return () => document.removeEventListener('mousedown', handleClick);
     }, []);
 
-    useEffect(() => {
-        document.body.style.overflow = mobileOpen ? 'hidden' : '';
-        return () => { document.body.style.overflow = ''; };
-    }, [mobileOpen]);
+    useBodyScrollLock(mobileOpen);
 
     const getInitials = () => {
         if (!user?.name) return 'U';
@@ -91,15 +91,21 @@ const Navbar = () => {
         <>
             <div className="h-14 lg:h-[4.75rem]"></div>
 
-            <nav className="fixed top-0 left-0 w-full bg-white z-50 h-14 lg:h-[4.75rem] border-b border-gray-200">
+            <nav
+                className="fixed top-0 left-0 w-full bg-white h-14 lg:h-[4.75rem] border-b border-gray-200"
+                style={{ zIndex: 'var(--pw-z-nav)' }}
+            >
 
                 <div
                     className="flex items-center h-full"
                     style={{ padding: '0 clamp(1rem, 3vw, 2.5rem)' }}
                 >
                     {/* ══════ Hamburger (mobile) ══════ */}
+                    {/* Hamburger — tablet only (768–1023px). On phones the
+                        bottom nav's "Categories" tab opens this same drawer;
+                        on desktop the inline nav groups replace it. */}
                     <button
-                        className="lg:hidden flex items-center justify-center w-10 h-10 text-gray-800 cursor-pointer flex-shrink-0"
+                        className="hidden md:flex lg:hidden items-center justify-center w-11 h-11 -ml-1.5 text-gray-800 cursor-pointer flex-shrink-0"
                         onClick={() => setMobileOpen(!mobileOpen)}
                         aria-label="Toggle menu"
                     >
@@ -231,19 +237,23 @@ const Navbar = () => {
                     {/* Mobile: spacer + search icon */}
                     <div className="flex-1 md:hidden" />
                     <button
-                        className="md:hidden flex items-center justify-center px-2 text-gray-700 cursor-pointer"
+                        className="md:hidden flex items-center justify-center w-11 h-11 text-gray-700 cursor-pointer"
                         onClick={() => setIsSearchOpen(true)}
+                        aria-label="Search"
                     >
                         <Search className="w-[1.3rem] h-[1.3rem]" strokeWidth={1.8} />
                     </button>
 
-                    {/* ══════ RIGHT: Profile + Bag ══════ */}
-                    <div className="flex items-center flex-shrink-0 gap-1 sm:gap-3">
+                    {/* ══════ RIGHT: Profile + Bag ══════
+                        Hidden on phones (< md) — these actions live in the
+                        mobile bottom nav. Shown on tablet/desktop. */}
+                    <div className="hidden md:flex items-center flex-shrink-0 gap-1 sm:gap-3">
                         {/* Profile */}
                         <div ref={accountRef} className="relative">
                             <button
                                 onClick={() => isLoggedIn ? setShowAccountMenu(!showAccountMenu) : navigate('/signin')}
-                                className="flex flex-col items-center justify-center cursor-pointer bg-transparent border-none text-gray-700 hover:text-black transition-colors"
+                                aria-label="Profile"
+                                className="flex flex-col items-center justify-center min-h-11 min-w-11 cursor-pointer bg-transparent border-none text-gray-700 hover:text-black transition-colors"
                                 style={{ fontFamily: 'inherit', padding: '0.25rem 0.5rem' }}
                             >
                                 {isLoggedIn ? (
@@ -290,7 +300,8 @@ const Navbar = () => {
                         {/* Wishlist */}
                         <button
                             onClick={() => navigate('/wishlist')}
-                            className="relative flex flex-col items-center justify-center cursor-pointer bg-transparent border-none text-gray-700 hover:text-black transition-colors"
+                            aria-label="Wishlist"
+                            className="relative flex flex-col items-center justify-center min-h-11 min-w-11 cursor-pointer bg-transparent border-none text-gray-700 hover:text-black transition-colors"
                             style={{ fontFamily: 'inherit', padding: '0.25rem 0.5rem' }}
                         >
                             <div className="relative">
@@ -316,7 +327,8 @@ const Navbar = () => {
                         {/* Bag */}
                         <button
                             onClick={openCart}
-                            className="flex flex-col items-center justify-center cursor-pointer bg-transparent border-none text-gray-700 hover:text-black transition-colors"
+                            aria-label="Shopping bag"
+                            className="flex flex-col items-center justify-center min-h-11 min-w-11 cursor-pointer bg-transparent border-none text-gray-700 hover:text-black transition-colors"
                             style={{ fontFamily: 'inherit', padding: '0.25rem 0.5rem' }}
                         >
                             <div className="relative">
@@ -344,12 +356,16 @@ const Navbar = () => {
 
             {/* ═══ Mobile Menu ═══ */}
             {mobileOpen && (
-                <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />
+                <div
+                    className="fixed inset-0 bg-black/30 backdrop-blur-sm lg:hidden"
+                    style={{ zIndex: 'var(--pw-z-menu-backdrop)' }}
+                    onClick={() => setMobileOpen(false)}
+                />
             )}
 
             <div
-                className="fixed top-0 left-0 bottom-0 z-50 w-[min(400px,88vw)] bg-white shadow-2xl lg:hidden flex flex-col transition-transform duration-300 ease-in-out"
-                style={{ transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)' }}
+                className="fixed top-0 left-0 bottom-0 w-[min(400px,88vw)] bg-white shadow-2xl lg:hidden flex flex-col transition-transform duration-300 ease-in-out"
+                style={{ transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)', zIndex: 'var(--pw-z-menu)' }}
             >
                 {/* Drawer Header */}
                 <div className="flex items-center justify-between px-6 h-14 border-b border-gray-100 flex-shrink-0">
