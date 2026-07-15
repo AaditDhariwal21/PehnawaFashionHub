@@ -6,6 +6,7 @@ import useBodyScrollLock from '../utils/useBodyScrollLock';
 import './SearchOverlay.css';
 import { productUrl } from '../utils/productUrl.js';
 import { displayCategory } from '../utils/displayCategory.js';
+import CloudinaryImage from './CloudinaryImage.jsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -143,7 +144,7 @@ const SearchOverlay = ({ isOpen, onClose }) => {
                                     >
                                         <div className="search-overlay__dropdown-thumb">
                                             {product.images?.[0]?.url ? (
-                                                <img src={product.images[0].url} alt={product?.name || "Product Image"} />
+                                                <CloudinaryImage src={product.images[0].url} alt={product?.name || "Product Image"} preset="thumb" />
                                             ) : (
                                                 <span className="search-overlay__dropdown-placeholder">📷</span>
                                             )}

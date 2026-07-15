@@ -4,6 +4,7 @@ import { X, Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import formatPrice from '../utils/formatPrice';
 import useBodyScrollLock from '../utils/useBodyScrollLock';
+import CloudinaryImage from './CloudinaryImage.jsx';
 
 const CartDrawer = () => {
     const {
@@ -239,9 +240,10 @@ const CartDrawer = () => {
                                         }}
                                     >
                                         {item.image ? (
-                                            <img
+                                            <CloudinaryImage
                                                 src={item.image}
                                                 alt={item?.name || "Product Image"}
+                                                preset="cartThumb"
                                                 style={{
                                                     width: '100%',
                                                     height: '100%',

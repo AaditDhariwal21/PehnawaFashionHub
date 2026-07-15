@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import formatPrice from '../utils/formatPrice';
 import './OrderDetailPage.css';
+import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -84,7 +85,7 @@ const OrderDetailPage = () => {
                                 <div key={i} className="odp-item">
                                     <div className="odp-item-img-wrap">
                                         {item.image ? (
-                                            <img src={item.image} alt={item?.name || "Product Image"} />
+                                            <CloudinaryImage src={item.image} alt={item?.name || "Product Image"} preset="cartThumb" />
                                         ) : (
                                             <div className="odp-item-placeholder">📷</div>
                                         )}

@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Scale, Trash2 } from 'lucide-react';
 import { useCompare } from '../context/CompareContext';
+import CloudinaryImage from './CloudinaryImage.jsx';
 
 const CompareBar = () => {
     const navigate = useNavigate();
@@ -115,9 +116,10 @@ const CompareBar = () => {
                                     }}
                                 >
                                     {item.image ? (
-                                        <img
+                                        <CloudinaryImage
                                             src={item.image}
                                             alt={item?.name || "Product Image"}
+                                            preset="thumb"
                                             style={{
                                                 width: '100%',
                                                 height: '100%',

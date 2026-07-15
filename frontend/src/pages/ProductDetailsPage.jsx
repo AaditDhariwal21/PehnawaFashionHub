@@ -18,6 +18,7 @@ import {
 import { getDisplayImages } from '../utils/getDisplayImages';
 import { getProductAltText } from '../utils/productAltText.js';
 import { displayCategory } from '../utils/displayCategory.js';
+import CloudinaryImage from '../components/CloudinaryImage.jsx';
 import { getSizeChart } from '../utils/sizeCharts.js';
 import RelatedProducts from '../components/RelatedProducts';
 import SizeChartModal from '../components/SizeChartModal';
@@ -231,7 +232,7 @@ const ProductDetailsPage = () => {
                         {/* Main Image */}
                         <div className="relative overflow-hidden rounded-2xl bg-gray-50 group" style={{ aspectRatio: '3/4' }}>
                             {mainImageUrl ? (
-                                <img src={mainImageUrl} alt={getProductAltText(product, images[selectedImage])} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                <CloudinaryImage src={mainImageUrl} alt={getProductAltText(product, images[selectedImage])} preset="detailMain" eager className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-gray-300"><span className="text-6xl">📷</span></div>
                             )}
@@ -257,7 +258,7 @@ const ProductDetailsPage = () => {
                                             transform: selectedImage === index ? 'scale(1.05)' : 'scale(1)',
                                         }}
                                     >
-                                        <img src={img.url} alt={`${getProductAltText(product, img)} ${index + 1}`} className="w-full h-full object-cover" />
+                                        <CloudinaryImage src={img.url} alt={`${getProductAltText(product, img)} ${index + 1}`} preset="thumb" className="w-full h-full object-cover" />
                                     </button>
                                 ))}
                             </div>
@@ -358,7 +359,7 @@ const ProductDetailsPage = () => {
                                                     }}
                                                 >
                                                     {previewImg ? (
-                                                        <img src={previewImg} alt={colorName} className="w-full h-full object-cover" />
+                                                        <CloudinaryImage src={previewImg} alt={colorName} preset="thumb" className="w-full h-full object-cover" />
                                                     ) : (
                                                         <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-400">
                                                             {colorName.charAt(0)}

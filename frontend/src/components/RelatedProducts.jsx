@@ -6,6 +6,7 @@ import { useCompare } from '../context/CompareContext';
 import formatPrice from '../utils/formatPrice';
 import { getCardPrice } from '../utils/getEffectivePrice';
 import { productUrl } from '../utils/productUrl.js';
+import CloudinaryImage from './CloudinaryImage.jsx';
 
 const API = import.meta.env.VITE_API_URL;
 const MAX_RELATED = 6;
@@ -137,9 +138,10 @@ const RelatedProducts = ({ currentProduct }) => {
                                     style={{ aspectRatio: '3/4', marginBottom: '0.5rem' }}
                                 >
                                     {imageUrl ? (
-                                        <img
+                                        <CloudinaryImage
                                             src={imageUrl}
                                             alt={product?.name || "Product Image"}
+                                            preset="card"
                                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                         />
                                     ) : (

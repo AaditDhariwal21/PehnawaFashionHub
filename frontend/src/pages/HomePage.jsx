@@ -16,6 +16,8 @@ const HomePage = () => {
                     src="/PehnawaHeroBanner.webp"
                     alt="Pehnawa — Where Tradition Meets Style"
                     className="w-full h-auto block"
+                    fetchPriority="high"
+                    decoding="async"
                 />
             </section>
 

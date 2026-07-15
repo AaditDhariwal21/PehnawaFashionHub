@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import formatPrice from '../utils/formatPrice';
+import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -134,9 +135,10 @@ const AdminOrdersPage = () => {
                                             <td style={{ ...tdStyle, width: '70px' }}>
                                                 <div style={{ position: 'relative', width: '50px', height: '50px' }}>
                                                     {firstItem?.image ? (
-                                                        <img
+                                                        <CloudinaryImage
                                                             src={firstItem.image}
                                                             alt={firstItem?.name || "Product Image"}
+                                                            preset="cartThumb"
                                                             style={{
                                                                 width: '50px', height: '50px', borderRadius: '0.5rem',
                                                                 objectFit: 'cover', border: '1px solid #f3f4f6',

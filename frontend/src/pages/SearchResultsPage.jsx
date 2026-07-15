@@ -8,6 +8,7 @@ import formatPrice from '../utils/formatPrice';
 import { startingPrice } from '../utils/variants.js';
 import { productUrl } from '../utils/productUrl.js';
 import './SearchResultsPage.css';
+import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
 const SearchResultsPage = () => {
     const [searchParams] = useSearchParams();
@@ -141,9 +142,10 @@ const SearchResultsPage = () => {
                                     {/* Image */}
                                     <div className="search-results__card-img-wrap">
                                         {imageUrl ? (
-                                            <img
+                                            <CloudinaryImage
                                                 src={imageUrl}
                                                 alt={product?.name || "Product Image"}
+                                                preset="card"
                                                 className="search-results__card-img"
                                             />
                                         ) : (

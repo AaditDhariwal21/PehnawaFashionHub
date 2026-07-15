@@ -5,6 +5,7 @@ import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import formatPrice from '../utils/formatPrice';
 import './AccountPage.css';
+import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -413,7 +414,7 @@ const AccountPage = () => {
                                                     <div className="account-order-thumb-wrap">
                                                         <div className="account-order-thumb">
                                                             {firstItem?.image ? (
-                                                                <img src={firstItem.image} alt={firstItem?.name || "Product Image"} />
+                                                                <CloudinaryImage src={firstItem.image} alt={firstItem?.name || "Product Image"} preset="cartThumb" />
                                                             ) : (
                                                                 <span className="account-order-thumb-placeholder">📦</span>
                                                             )}

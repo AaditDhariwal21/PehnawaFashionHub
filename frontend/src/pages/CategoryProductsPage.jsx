@@ -8,6 +8,7 @@ import formatPrice from '../utils/formatPrice';
 import { startingPrice } from '../utils/variants.js';
 import { productUrl } from '../utils/productUrl.js';
 import { displayCategory } from '../utils/displayCategory.js';
+import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
 const CategoryProductsPage = () => {
     const { categoryName, subCategory } = useParams();
@@ -163,9 +164,10 @@ const CategoryProductsPage = () => {
                                         style={{ aspectRatio: '3/4' }}
                                     >
                                         {imageUrl ? (
-                                            <img
+                                            <CloudinaryImage
                                                 src={imageUrl}
                                                 alt={product?.name || "Product Image"}
+                                                preset="card"
                                                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                             />
                                         ) : (

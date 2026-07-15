@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import formatPrice from '../utils/formatPrice';
 import './OrderConfirmationPage.css';
+import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -246,7 +247,7 @@ const OrderConfirmationPage = () => {
                         <div className="ocp-items">
                             {order.items.map((item, i) => (
                                 <div key={i} className="ocp-item">
-                                    <img src={item.image} alt={item?.name || "Product Image"} className="ocp-item-img" />
+                                    <CloudinaryImage src={item.image} alt={item?.name || "Product Image"} preset="cartThumb" className="ocp-item-img" />
                                     <div className="ocp-item-info">
                                         <p className="ocp-item-name">{item.name}</p>
                                         {item.size && <p className="ocp-item-size">Size: {item.size}</p>}

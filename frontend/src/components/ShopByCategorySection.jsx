@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import CloudinaryImage from './CloudinaryImage.jsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -96,9 +97,10 @@ const ShopByCategorySection = () => {
                             {/* Category Image */}
                             <div className="aspect-square bg-stone-100 rounded-lg overflow-hidden relative mb-2">
                                 {coverImage ? (
-                                    <img
+                                    <CloudinaryImage
                                         src={coverImage}
                                         alt={category.name}
+                                        preset="cover"
                                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                     />
                                 ) : (

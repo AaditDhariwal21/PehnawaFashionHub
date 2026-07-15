@@ -10,6 +10,7 @@ import { findVariant, startingPrice, displayPrice, hasDiscount, defaultColor, to
 import { getDisplayImages } from '../utils/getDisplayImages';
 import { productUrl } from '../utils/productUrl.js';
 import { displayCategory } from '../utils/displayCategory.js';
+import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -230,9 +231,10 @@ const WishlistPage = () => {
                                             onClick={() => navigate(productUrl(product))}
                                         >
                                             {imageUrl ? (
-                                                <img
+                                                <CloudinaryImage
                                                     src={imageUrl}
                                                     alt={product?.name || "Product Image"}
+                                                    preset="card"
                                                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                                 />
                                             ) : (

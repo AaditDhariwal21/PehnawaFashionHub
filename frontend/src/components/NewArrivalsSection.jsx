@@ -45,7 +45,9 @@ const NewArrivalsSection = () => {
                 New Arrivals
             </h2>
 
-            <ProductCarousel products={products} loading={loading} />
+            {/* Topmost product rail, just below the hero — its first row is
+                above the fold, so eager-load those images at high priority. */}
+            <ProductCarousel products={products} loading={loading} eager />
         </div>
     );
 };

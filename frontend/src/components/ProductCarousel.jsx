@@ -7,6 +7,7 @@ import formatPrice from '../utils/formatPrice';
 import { startingPrice } from '../utils/variants.js';
 import { productUrl } from '../utils/productUrl.js';
 import { displayCategory } from '../utils/displayCategory.js';
+import CloudinaryImage from './CloudinaryImage.jsx';
 
 /*
  * ProductCarousel — the shared home-page product rail used by both the
@@ -42,7 +43,7 @@ const prefersReducedMotion = () =>
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const ProductCarousel = ({ products = [], loading = false }) => {
+const ProductCarousel = ({ products = [], loading = false, eager = false }) => {
     const navigate = useNavigate();
     const { isWishlisted, toggleWishlist } = useWishlist();
     const { isInCompare, toggleCompare } = useCompare();
@@ -197,7 +198,9 @@ const ProductCarousel = ({ products = [], loading = false }) => {
 
     const arrowsDisabled = !!anim || products.length === 0 || totalPages <= 1;
 
-    const renderCard = (product) => (
+    // `cardEager` is set only for the first, above-the-fold page of an eager
+    // carousel (New Arrivals). Everything else lazy-loads.
+    const renderCard = (product, cardEager = false) => (
         <div
             key={product._id}
             className="group cursor-pointer min-w-0"
@@ -206,9 +209,11 @@ const ProductCarousel = ({ products = [], loading = false }) => {
             {/* Product Image */}
             <div className="aspect-[3/4] bg-stone-100 rounded-lg overflow-hidden relative mb-2 sm:mb-3">
                 {product.images && product.images.length > 0 ? (
-                    <img
+                    <CloudinaryImage
                         src={product.images[0].url}
                         alt={product?.name || 'Product Image'}
+                        preset="card"
+                        eager={cardEager}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                 ) : (
@@ -332,11 +337,18 @@ const ProductCarousel = ({ products = [], loading = false }) => {
                                     }
                                 }}
                             >
-                                {pages.map((page) => (
-                                    <div key={page.key} className="shrink-0 grow-0 basis-full min-w-0" style={gridStyle}>
-                                        {page.items.map(renderCard)}
-                                    </div>
-                                ))}
+                                {pages.map((page) => {
+                                    // Eager-load only the initially visible first
+                                    // page of an eager carousel — the real
+                                    // above-the-fold homepage imagery.
+                                    const pageEager =
+                                        eager && page.key === 'cur' && currentIndex === 0 && !anim;
+                                    return (
+                                        <div key={page.key} className="shrink-0 grow-0 basis-full min-w-0" style={gridStyle}>
+                                            {page.items.map((p) => renderCard(p, pageEager))}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         ) : (
                             <div className="text-center text-gray-500 py-10">No products available</div>

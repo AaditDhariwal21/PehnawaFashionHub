@@ -7,6 +7,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import formatPrice from '../utils/formatPrice';
 import './CheckoutPage.css';
+import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
 const FALLBACK_SHIPPING = 8;
 const API = import.meta.env.VITE_API_URL;
@@ -575,9 +576,10 @@ const CheckoutPage = () => {
                                             }}
                                         >
                                             {item.image ? (
-                                                <img
+                                                <CloudinaryImage
                                                     src={item.image}
                                                     alt={item?.name || "Product Image"}
+                                                    preset="cartThumb"
                                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                                 />
                                             ) : (

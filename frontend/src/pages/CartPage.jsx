@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar';
 import { useCart } from '../context/CartContext';
 import { useCompare } from '../context/CompareContext';
 import formatPrice from '../utils/formatPrice';
+import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
 const CartPage = () => {
     const navigate = useNavigate();
@@ -105,7 +106,7 @@ const CartPage = () => {
             onClick={() => navigate(`/product/${item.productId}`)}
         >
             {item.image ? (
-                <img src={item.image} alt={item?.name || 'Product Image'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <CloudinaryImage src={item.image} alt={item?.name || 'Product Image'} preset="cartThumb" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '1.5rem' }}>📷</div>
             )}

@@ -11,6 +11,7 @@ import { getDisplayImages } from '../utils/getDisplayImages';
 import { productUrl } from '../utils/productUrl.js';
 import { displayCategory } from '../utils/displayCategory.js';
 import './ComparePage.css';
+import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -206,7 +207,7 @@ const ComparePage = () => {
                                             onClick={() => navigate(productUrl(p))}
                                         >
                                             {imgUrl ? (
-                                                <img src={imgUrl} alt={p?.name || "Product Image"} />
+                                                <CloudinaryImage src={imgUrl} alt={p?.name || "Product Image"} preset="card" />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center">
                                                     <span style={{ fontSize: '3rem', color: '#d1d5db' }}>📷</span>
