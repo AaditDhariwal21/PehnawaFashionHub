@@ -19,6 +19,7 @@ import ScrollToTop from './components/ScrollToTop';
 import OrderDetailPage from './pages/OrderDetailPage';
 import AdminOrdersPage from './pages/AdminOrdersPage';
 import AdminOrderDetailPage from './pages/AdminOrderDetailPage';
+import AdminPromoCodesPage from './pages/AdminPromoCodesPage';
 import OrderConfirmationPage from './pages/OrderConfirmationPage';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -59,6 +60,7 @@ function App() {
             <Route path="/admin/manage-products" element={<AdminManageProducts />} />
             <Route path="/admin/orders" element={<AdminOrdersPage />} />
             <Route path="/admin/orders/:id" element={<AdminOrderDetailPage />} />
+            <Route path="/admin/promo-codes" element={<AdminPromoCodesPage />} />
             <Route path="/account/orders/:id" element={<OrderDetailPage />} />
             <Route path="/order-confirmation/:id" element={<OrderConfirmationPage />} />
             <Route path="/order-confirmation" element={<OrderConfirmationPage />} />

@@ -7,11 +7,14 @@ import { useCompare } from '../context/CompareContext';
 import formatPrice from '../utils/formatPrice';
 import { startingPrice } from '../utils/variants.js';
 import { productUrl } from '../utils/productUrl.js';
-import { displayCategory } from '../utils/displayCategory.js';
 import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
 const CategoryProductsPage = () => {
-    const { categoryName, subCategory } = useParams();
+    /* Route params are positional, not semantic: /products/:a/:b is
+       gender-then-category, while /products/:a alone may be either. The server
+       resolves which is which against the taxonomy — the client just forwards
+       the segments. */
+    const { categoryName: firstSegment, subCategory: secondSegment } = useParams();
     const navigate = useNavigate();
     const { isWishlisted, toggleWishlist } = useWishlist();
     const { isInCompare, toggleCompare } = useCompare();
@@ -20,22 +23,20 @@ const CategoryProductsPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // When a subcategory is present (Kids / Boys, Kids / Girls), use
-    // it as the heading. Otherwise fall back to the category itself.
-    // Normalize the URL slug through displayCategory so a stale
-    // /products/Kidswear bookmark still renders as "Kids".
-    const displayName = subCategory
-        ? `${displayCategory(decodeURIComponent(categoryName))} — ${decodeURIComponent(subCategory)}`
-        : displayCategory(decodeURIComponent(categoryName));
+    // "Women — Lehengas" for a two-segment URL, otherwise just the one segment
+    // (which may itself be a gender, e.g. /products/Women).
+    const displayName = secondSegment
+        ? `${decodeURIComponent(firstSegment)} — ${decodeURIComponent(secondSegment)}`
+        : decodeURIComponent(firstSegment);
 
     useEffect(() => {
         const fetchProducts = async () => {
             try {
                 setLoading(true);
                 setError(null);
-                const url = subCategory
-                    ? `${import.meta.env.VITE_API_URL}/products/category/${encodeURIComponent(categoryName)}/${encodeURIComponent(subCategory)}`
-                    : `${import.meta.env.VITE_API_URL}/products/category/${encodeURIComponent(categoryName)}`;
+                const url = secondSegment
+                    ? `${import.meta.env.VITE_API_URL}/products/category/${encodeURIComponent(firstSegment)}/${encodeURIComponent(secondSegment)}`
+                    : `${import.meta.env.VITE_API_URL}/products/category/${encodeURIComponent(firstSegment)}`;
                 const response = await fetch(url);
                 const data = await response.json();
 
@@ -52,7 +53,7 @@ const CategoryProductsPage = () => {
         };
 
         fetchProducts();
-    }, [categoryName, subCategory]);
+    }, [firstSegment, secondSegment]);
 
     /* ───────────────── Loading ───────────────── */
     if (loading) {
@@ -196,7 +197,7 @@ const CategoryProductsPage = () => {
                                         </button>
 
                                         {/* Special Tag */}
-                                        {product.specialTag && (
+                                        {product.specialTags?.length > 0 && (
                                             <span
                                                 className="absolute top-3 left-3 text-xs font-bold uppercase tracking-wider text-white rounded-full"
                                                 style={{
@@ -204,7 +205,7 @@ const CategoryProductsPage = () => {
                                                     background: 'linear-gradient(135deg, #EFBF04, #d4a904)',
                                                 }}
                                             >
-                                                {product.specialTag}
+                                                {product.specialTags[0]}
                                             </span>
                                         )}
 
@@ -217,7 +218,7 @@ const CategoryProductsPage = () => {
                                                     name: product.name,
                                                     image: imageUrl || '',
                                                     price: startingPrice(product),
-                                                    category: product.category,
+                                                    gender: product.gender, category: product.category,
                                                 });
                                             }}
                                             className="absolute bottom-3 left-3 w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"

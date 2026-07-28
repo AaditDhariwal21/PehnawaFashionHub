@@ -17,7 +17,6 @@ import {
 } from '../utils/variants.js';
 import { getDisplayImages } from '../utils/getDisplayImages';
 import { getProductAltText } from '../utils/productAltText.js';
-import { displayCategory } from '../utils/displayCategory.js';
 import CloudinaryImage from '../components/CloudinaryImage.jsx';
 import { getSizeChart } from '../utils/sizeCharts.js';
 import RelatedProducts from '../components/RelatedProducts';
@@ -207,16 +206,18 @@ const ProductDetailsPage = () => {
                         <ChevronLeft className="w-4 h-4" /> Home
                     </button>
                     <span>/</span>
-                    <button onClick={() => navigate(`/products/${encodeURIComponent(displayCategory(product.category))}`)} className="hover:text-gray-800 transition-colors cursor-pointer" style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit' }}>
-                        {displayCategory(product.category)}
-                    </button>
-                    {product.subCategory && (
+                    {product.gender && (
                         <>
-                            <span>/</span>
-                            <button onClick={() => navigate(`/products/${encodeURIComponent(displayCategory(product.category))}/${encodeURIComponent(product.subCategory)}`)} className="hover:text-gray-800 transition-colors cursor-pointer" style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit' }}>
-                                {product.subCategory}
+                            <button onClick={() => navigate(`/products/${encodeURIComponent(product.gender)}`)} className="hover:text-gray-800 transition-colors cursor-pointer" style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit' }}>
+                                {product.gender}
                             </button>
+                            <span>/</span>
                         </>
+                    )}
+                    {product.category && (
+                        <button onClick={() => navigate(`/products/${encodeURIComponent(product.gender)}/${encodeURIComponent(product.category)}`)} className="hover:text-gray-800 transition-colors cursor-pointer" style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit' }}>
+                            {product.category}
+                        </button>
                     )}
                     <span>/</span>
                     <span className="text-gray-800 font-medium truncate max-w-xs">{product.name}</span>
@@ -236,9 +237,9 @@ const ProductDetailsPage = () => {
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-gray-300"><span className="text-6xl">📷</span></div>
                             )}
-                            {product.specialTag && (
+                            {product.specialTags?.length > 0 && (
                                 <span className="absolute top-4 left-4 text-xs font-bold uppercase tracking-wider text-white rounded-full" style={{ padding: '0.35rem 0.9rem', background: 'linear-gradient(135deg, #EFBF04, #d4a904)' }}>
-                                    {product.specialTag}
+                                    {product.specialTags[0]}
                                 </span>
                             )}
                         </div>
@@ -271,7 +272,7 @@ const ProductDetailsPage = () => {
                     <div className="w-full md:flex-1 min-w-0">
                         {/* Category */}
                         <p className="uppercase tracking-widest font-semibold" style={{ fontSize: '0.7rem', color: '#EFBF04', letterSpacing: '0.15em', marginBottom: '0.5rem' }}>
-                            {displayCategory(product.category)}
+                            {product.category}
                         </p>
 
                         {/* Product Name */}

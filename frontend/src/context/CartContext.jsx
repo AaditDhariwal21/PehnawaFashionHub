@@ -40,6 +40,29 @@ export const CartProvider = ({ children }) => {
     const [buyNowItem, setBuyNowItemState] = useState(readBuyNow);
     const addTimerRef = useRef(null);
 
+    /**
+     * The promo the server validated for this cart, exactly as it came back
+     * from /api/promo/validate — every figure in it is server-computed and
+     * nothing here recalculates a discount locally.
+     *
+     * Deliberately NOT persisted to localStorage: a discount is only ever
+     * valid against a specific cart at a specific moment, and reviving one
+     * from a previous session is precisely the stale-discount bug this state
+     * exists to prevent.
+     *
+     * Every mutator below drops it. A discount computed against a cart that
+     * has since changed is worthless — remove an item and the minimum-order
+     * threshold or the eligible-item set may no longer hold — so rather than
+     * polling to re-check, changing the cart makes the discount visibly
+     * disappear and the customer re-applies, which re-validates server-side.
+     * (create-checkout re-validates independently in any case; this only keeps
+     * the UI from ever showing a discount the server wouldn't honour.)
+     */
+    const [appliedPromo, setAppliedPromo] = useState(null);
+
+    const applyPromo = useCallback((serverPromo) => setAppliedPromo(serverPromo), []);
+    const clearPromo = useCallback(() => setAppliedPromo(null), []);
+
     // Persist to localStorage on every change
     useEffect(() => {
         writeCart(cartItems);
@@ -60,6 +83,7 @@ export const CartProvider = ({ children }) => {
             return [...prev, { ...normalized, quantity: normalized.quantity || 1 }];
         });
         setJustAdded(true);
+        setAppliedPromo(null);
         if (addTimerRef.current) clearTimeout(addTimerRef.current);
         addTimerRef.current = setTimeout(() => setJustAdded(false), 3000);
     }, []);
@@ -68,6 +92,7 @@ export const CartProvider = ({ children }) => {
         setCartItems((prev) => prev.filter(
             (i) => !(i.productId === productId && i.size === size && (i.color || '') === color)
         ));
+        setAppliedPromo(null);
     }, []);
 
     const updateQuantity = useCallback((productId, size, color = '', qty) => {
@@ -79,6 +104,7 @@ export const CartProvider = ({ children }) => {
                     : i
             )
         );
+        setAppliedPromo(null);
     }, []);
 
     const getSubtotal = useCallback(() => {
@@ -91,16 +117,21 @@ export const CartProvider = ({ children }) => {
 
     const clearCart = useCallback(() => {
         setCartItems([]);
+        setAppliedPromo(null);
         localStorage.removeItem(STORAGE_KEY);
     }, []);
 
+    /* Buy Now swaps the checkout set to a single item, so a promo validated
+       against the cart can't carry over to it (or back again). */
     const setBuyNowItem = useCallback((item) => {
         setBuyNowItemState(item);
+        setAppliedPromo(null);
         localStorage.setItem(BUYNOW_KEY, JSON.stringify(item));
     }, []);
 
     const clearBuyNowItem = useCallback(() => {
         setBuyNowItemState(null);
+        setAppliedPromo(null);
         localStorage.removeItem(BUYNOW_KEY);
     }, []);
 
@@ -121,6 +152,9 @@ export const CartProvider = ({ children }) => {
                 buyNowItem,
                 setBuyNowItem,
                 clearBuyNowItem,
+                appliedPromo,
+                applyPromo,
+                clearPromo,
             }}
         >
             {children}

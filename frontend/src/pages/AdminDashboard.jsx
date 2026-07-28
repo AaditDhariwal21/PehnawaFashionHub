@@ -192,6 +192,29 @@ const AdminDashboard = () => {
                         <h3 className="text-base font-bold text-gray-900 mb-1">View Orders</h3>
                         <p className="text-sm text-gray-500">View and manage all customer orders.</p>
                     </div>
+
+                    {/* Promo Codes Card */}
+                    <div
+                        className="rounded-xl cursor-pointer transition-all hover:scale-[1.02]"
+                        style={{
+                            backgroundColor: '#FFFFFF',
+                            border: '2px solid #FAD76C',
+                            boxShadow: '0 2px 12px rgba(250, 215, 108, 0.15)',
+                            padding: '1.5rem'
+                        }}
+                        onClick={() => navigate('/admin/promo-codes')}
+                    >
+                        <div
+                            className="w-12 h-12 rounded-full flex items-center justify-center mb-4"
+                            style={{ backgroundColor: 'rgba(239, 191, 4, 0.15)' }}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="#EFBF04">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-base font-bold text-gray-900 mb-1">Promo Codes</h3>
+                        <p className="text-sm text-gray-500">Create, edit and deactivate discount codes.</p>
+                    </div>
                 </div>
             </main>
 

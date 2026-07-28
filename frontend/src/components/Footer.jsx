@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
+import { GENDERS, CATEGORIES_BY_GENDER } from '../utils/productCategories.js';
 
 const Footer = () => {
     const navigate = useNavigate();
@@ -10,21 +11,17 @@ const Footer = () => {
     const [open, setOpen] = useState({ quick: false, company: false });
     const toggle = (key) => setOpen((p) => ({ ...p, [key]: !p[key] }));
 
-    const quickLinks = [
-        { label: 'New Arrivals', path: '/products/New Arrivals' },
-        { label: 'Anarkalis', path: '/products/Anarkalis' },
-        { label: 'Coord Sets', path: '/products/Coord Sets' },
-        { label: 'Lehangas', path: '/products/Lehangas' },
-        { label: 'Indo Western', path: '/products/Indo Western' },
-        { label: 'Suits & Kurtis', path: '/products/Suits & Kurtis' },
-        { label: 'Sarees', path: '/products/Sarees' },
-        { label: 'Blouses', path: '/products/Blouses' },
-        { label: 'Kids — Boys', path: '/products/Kids/Boys' },
-        { label: 'Kids — Girls', path: '/products/Kids/Girls' },
-        { label: "Men's Kurta", path: "/products/Men's Kurta" },
-        { label: 'Dupattas', path: '/products/Dupattas' },
-        { label: 'Pashminas', path: '/products/Pashminas' },
-    ];
+    /* Derived from the shared taxonomy. This list previously included
+       "New Arrivals" — a special tag, never a category, so the link resolved to
+       an empty page — and hand-written paths that were not URL-encoded. Kids
+       entries keep their "Kids — Boys" phrasing because the category name alone
+       ("Boys") would be ambiguous in a flat footer list. */
+    const quickLinks = GENDERS.flatMap((gender) =>
+        CATEGORIES_BY_GENDER[gender].map((category) => ({
+            label: gender === 'Kids' ? `Kids — ${category}` : category,
+            path: `/products/${encodeURIComponent(gender)}/${encodeURIComponent(category)}`,
+        }))
+    );
 
     const companyLinks = [
         { label: 'About us', path: '/about-us' },

@@ -5,11 +5,11 @@ import 'react-quill-new/dist/quill.snow.css';
 import VariantMatrix from './VariantMatrix';
 import ColorImagesManager, { finalizeColors } from './ColorImagesManager';
 import { buildVariantMatrix } from '../utils/variants.js';
+import { GENDERS, CATEGORIES_BY_GENDER, SPECIAL_TAGS, categoriesForGender } from '../utils/productCategories.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
-const categories = ['Anarkalis', 'Coord Sets', 'Lehangas', 'Indo Western', 'Suits & Kurtis', 'Sarees', 'Blouses', 'Kids', "Men's Kurta", 'Dupattas', 'Pashminas'];
-const KIDS_SUBCATEGORIES = ['Boys', 'Girls'];
-const specialTags = ['', 'New Arrival', 'Best Seller', 'Sale', 'Trending'];
+/* Category options are derived from the selected gender, never a flat list —
+   see the dependent <select> below. Special tags are an independent facet. */
 
 const quillModules = {
     toolbar: [
@@ -25,7 +25,7 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
     const [formData, setFormData] = useState({
         name: '', shortDescription: '', description: '',
         price: '',
-        category: '', subCategory: '', specialTag: '', weight: '',
+        gender: '', category: '', specialTags: [], weight: '',
         isCategoryCover: false,
     });
 
@@ -44,9 +44,10 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
         const { name, value } = e.target;
         setFormData((prev) => {
             const next = { ...prev, [name]: value };
-            // Clear subCategory when leaving Kids so it can't ride
-            // along with a Men/Women product if the admin switches.
-            if (name === 'category' && value !== 'Kids') next.subCategory = '';
+            /* Category is scoped to gender, so changing gender invalidates any
+               category already chosen. Clearing it is what makes an invalid
+               pair unreachable through the UI rather than merely discouraged. */
+            if (name === 'gender' && value !== prev.gender) next.category = '';
             return next;
         });
     };
@@ -87,12 +88,12 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
         try {
             const token = localStorage.getItem('token');
             if (!token) { setError('You must be logged in.'); setIsLoading(false); return; }
-            if (formData.category === 'Kids' && !KIDS_SUBCATEGORIES.includes(formData.subCategory)) {
-                setError('Please select a subcategory (Boys or Girls) for Kids products.');
+            if (!formData.gender) {
+                setError('Please select a gender.');
                 setIsLoading(false);
                 return;
             }
-            if (!formData.name || !formData.description || !formData.price || !formData.category || !formData.weight) {
+            if (!formData.name || !formData.description || !formData.price || !formData.gender || !formData.category || !formData.weight) {
                 setError('Please fill in all required fields.'); setIsLoading(false); return;
             }
             if (colors.length === 0) {
@@ -131,14 +132,14 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
                 shortDescription: formData.shortDescription,
                 description: formData.description,
                 price: Number(formData.price),
+                gender: formData.gender,
                 category: formData.category,
-                subCategory: formData.category === 'Kids' ? formData.subCategory : null,
                 weight: Number(formData.weight),
                 // The first color's first image is the canonical card thumbnail.
                 images: finalColors[0].images,
                 colors: finalColors,
                 variants: cleanVariants,
-                specialTag: formData.specialTag || null,
+                specialTags: formData.specialTags,
                 isCategoryCover: formData.isCategoryCover,
             };
 
@@ -151,7 +152,7 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
             if (!data.success) { setError(data.message || 'Failed to create product.'); setIsLoading(false); return; }
 
             // Reset form
-            setFormData({ name: '', shortDescription: '', description: '', price: '', category: '', subCategory: '', specialTag: '', weight: '', isCategoryCover: false });
+            setFormData({ name: '', shortDescription: '', description: '', price: '', gender: '', category: '', specialTags: [], weight: '', isCategoryCover: false });
             setColors([]);
             setSizes([]); setVariants([]);
 
@@ -240,32 +241,63 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
                                     </div>
                                 </div>
 
+                                {/* Gender first, then a category list derived from it.
+                                    The category select is disabled until a gender is
+                                    chosen and only ever offers that gender's values, so
+                                    an invalid pair is unreachable here rather than merely
+                                    rejected on submit. */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className={labelCls}>Category <span className="text-red-400">*</span></label>
-                                        <select name="category" value={formData.category} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}>
-                                            <option value="">Select category</option>
-                                            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                                        <label className={labelCls}>Gender <span className="text-red-400">*</span></label>
+                                        <select name="gender" value={formData.gender} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}>
+                                            <option value="">Select gender</option>
+                                            {GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}
                                         </select>
                                     </div>
                                     <div>
-                                        <label className={labelCls}>Special Tag</label>
-                                        <select name="specialTag" value={formData.specialTag} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}>
-                                            <option value="">None</option>
-                                            {specialTags.filter(Boolean).map((t) => <option key={t} value={t}>{t}</option>)}
+                                        <label className={labelCls}>Category <span className="text-red-400">*</span></label>
+                                        <select
+                                            name="category"
+                                            value={formData.category}
+                                            onChange={handleInputChange}
+                                            disabled={!formData.gender}
+                                            className={`${inputCls} ${formData.gender ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                                            style={inputPad}
+                                        >
+                                            <option value="">
+                                                {formData.gender ? 'Select category' : 'Select a gender first'}
+                                            </option>
+                                            {categoriesForGender(formData.gender).map((c) => (
+                                                <option key={c} value={c}>{c}</option>
+                                            ))}
                                         </select>
                                     </div>
                                 </div>
 
-                                {formData.category === 'Kids' && (
-                                    <div>
-                                        <label className={labelCls}>Subcategory <span className="text-red-400">*</span></label>
-                                        <select name="subCategory" value={formData.subCategory} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}>
-                                            <option value="">Select Boys or Girls</option>
-                                            {KIDS_SUBCATEGORIES.map((s) => <option key={s} value={s}>{s}</option>)}
-                                        </select>
+                                {/* Special tags: independent, optional, multi-select.
+                                    Deliberately not a category control and never shown in
+                                    category navigation. */}
+                                <div>
+                                    <label className={labelCls}>Special Tags</label>
+                                    <div className="flex flex-wrap gap-4 mt-1">
+                                        {SPECIAL_TAGS.map((tag) => (
+                                            <label key={tag} className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.specialTags.includes(tag)}
+                                                    onChange={(e) => setFormData((p) => ({
+                                                        ...p,
+                                                        specialTags: e.target.checked
+                                                            ? [...p.specialTags, tag]
+                                                            : p.specialTags.filter((t) => t !== tag),
+                                                    }))}
+                                                    className="w-4 h-4 rounded border-gray-300 cursor-pointer accent-amber-500"
+                                                />
+                                                <span className="text-xs text-gray-600">{tag}</span>
+                                            </label>
+                                        ))}
                                     </div>
-                                )}
+                                </div>
 
                                 {formData.category && (
                                     <label className="flex items-center gap-2 cursor-pointer" style={{ marginTop: '-0.5rem' }}>

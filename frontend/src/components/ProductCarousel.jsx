@@ -6,7 +6,6 @@ import { useCompare } from '../context/CompareContext';
 import formatPrice from '../utils/formatPrice';
 import { startingPrice } from '../utils/variants.js';
 import { productUrl } from '../utils/productUrl.js';
-import { displayCategory } from '../utils/displayCategory.js';
 import CloudinaryImage from './CloudinaryImage.jsx';
 
 /*
@@ -246,7 +245,7 @@ const ProductCarousel = ({ products = [], loading = false, eager = false }) => {
                             name: product.name,
                             image: product.images?.[0]?.url || '',
                             price: startingPrice(product),
-                            category: product.category,
+                            gender: product.gender, category: product.category,
                         });
                     }}
                     className="absolute bottom-2 left-2 w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
@@ -266,7 +265,7 @@ const ProductCarousel = ({ products = [], loading = false, eager = false }) => {
                     className="text-gray-800 font-normal leading-snug mb-1 line-clamp-2"
                     style={{ fontSize: 'clamp(0.75rem, 1.5vw, 1rem)' }}
                 >
-                    {product.name} - {displayCategory(product.category)}
+                    {product.name} - {product.category}
                 </h3>
                 <p
                     className="text-gray-600 font-medium"

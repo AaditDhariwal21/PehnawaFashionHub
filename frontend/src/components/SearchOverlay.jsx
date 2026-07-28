@@ -5,7 +5,6 @@ import { Search, X } from 'lucide-react';
 import useBodyScrollLock from '../utils/useBodyScrollLock';
 import './SearchOverlay.css';
 import { productUrl } from '../utils/productUrl.js';
-import { displayCategory } from '../utils/displayCategory.js';
 import CloudinaryImage from './CloudinaryImage.jsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -152,7 +151,7 @@ const SearchOverlay = ({ isOpen, onClose }) => {
                                         <div className="search-overlay__dropdown-info">
                                             <p className="search-overlay__dropdown-name">{product.name}</p>
                                             <p className="search-overlay__dropdown-meta">
-                                                <span className="search-overlay__dropdown-cat">{displayCategory(product.category)}</span>
+                                                <span className="search-overlay__dropdown-cat">{product.category}</span>
                                             </p>
                                         </div>
                                     </div>

@@ -1,5 +1,50 @@
 import Product from "../models/Products.js";
 import { validateVariants } from "../utils/variants.js";
+import {
+    GENDERS,
+    ALL_CATEGORIES,
+    CATEGORIES_BY_GENDER,
+    SPECIAL_TAGS,
+    isValidCategoryForGender,
+} from "../config/productTaxonomy.js";
+
+/**
+ * Escape a user-supplied string before it goes anywhere near a RegExp.
+ * Free-text search still needs substring matching, so unlike the category
+ * filters it can't be reduced to an exact lookup.
+ */
+const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Validate a gender/category pair for a write.
+ * @returns {string|null} an error message, or null when the pair is valid.
+ */
+const validateGenderCategory = (gender, category) => {
+    if (!GENDERS.includes(gender)) {
+        return `Gender must be one of: ${GENDERS.join(", ")}.`;
+    }
+    if (!isValidCategoryForGender(gender, category)) {
+        return `"${category}" is not a valid category for ${gender}. Allowed: ${CATEGORIES_BY_GENDER[gender].join(", ")}.`;
+    }
+    return null;
+};
+
+/**
+ * Coerce and validate the special tags payload. Accepts an array, a single
+ * string, or nothing — the field is optional and independent of gender and
+ * category.
+ * @returns {{tags: string[]}|{error: string}}
+ */
+const normalizeSpecialTags = (value) => {
+    if (value === undefined || value === null || value === "") return { tags: [] };
+    const list = Array.isArray(value) ? value : [value];
+    const cleaned = [...new Set(list.map((t) => String(t).trim()).filter(Boolean))];
+    const unknown = cleaned.filter((t) => !SPECIAL_TAGS.includes(t));
+    if (unknown.length) {
+        return { error: `Unknown special tag(s): ${unknown.join(", ")}. Allowed: ${SPECIAL_TAGS.join(", ")}.` };
+    }
+    return { tags: cleaned };
+};
 
 // Get all products (Public - anyone can access)
 export const getAllProducts = async (req, res) => {
@@ -94,51 +139,90 @@ export const getProductBySlug = async (req, res) => {
     }
 };
 
-// Category aliases for backward compatibility.
-//
-// Legacy products may still carry the old "Kidswear" string in their
-// `category` field if the migration script hasn't been run. Requests
-// for "Kids" should surface those too — and vice versa — so shoppers
-// never see an empty category page during the migration window.
-const CATEGORY_ALIASES = {
-    kids: ["Kids", "Kidswear"],
-    kidswear: ["Kids", "Kidswear"],
+/**
+ * Resolve a URL segment to a canonical gender or category value.
+ *
+ * Both are closed sets now, so this is an exact match against the taxonomy
+ * rather than the case-insensitive regex the free-form design required. That
+ * also removes the regex-injection surface: the segment is never compiled into
+ * a RegExp, it is only ever looked up.
+ *
+ * Case-tolerant so existing lower-cased links keep working, but it always
+ * returns the canonical spelling.
+ */
+const canonical = (values, segment) => {
+    const needle = String(segment || "").trim().toLowerCase();
+    return values.find((v) => v.toLowerCase() === needle) || null;
 };
 
-const resolveCategoryFilter = (categoryName) => {
-    const key = String(categoryName || "").toLowerCase();
-    const aliases = CATEGORY_ALIASES[key];
-    if (aliases) {
-        return { $in: aliases.map((c) => new RegExp(`^${c}$`, "i")) };
+/**
+ * Build the product filter for a browse request.
+ *
+ * URL shapes, all of which predate this change except the gender one:
+ *   /category/Lehengas          → that category
+ *   /category/Women             → every Women's product (the cross-cutting
+ *                                 query the flat design could not answer)
+ *   /category/Kids/Boys         → gender + category. Existing Kids links keep
+ *                                 working unchanged: what used to be
+ *                                 category=Kids + subCategory=Boys is now
+ *                                 gender=Kids + category=Boys, which is the
+ *                                 same two segments in the same order.
+ *   ?gender=Women               → narrows any of the above
+ *
+ * @returns {{filter: object}|{error: string}}
+ */
+const buildBrowseFilter = (segment, subSegment, queryGender) => {
+    const filter = {};
+
+    const genderFromQuery = queryGender ? canonical(GENDERS, queryGender) : null;
+    if (queryGender && !genderFromQuery) {
+        return { error: `Unknown gender "${queryGender}".` };
     }
-    return { $regex: new RegExp(`^${categoryName}$`, "i") };
+    if (genderFromQuery) filter.gender = genderFromQuery;
+
+    const genderSegment = canonical(GENDERS, segment);
+    const categorySegment = canonical(ALL_CATEGORIES, segment);
+
+    if (subSegment) {
+        /* Two segments: gender then category. */
+        if (!genderSegment) return { error: `Unknown gender "${segment}".` };
+        const category = canonical(CATEGORIES_BY_GENDER[genderSegment], subSegment);
+        if (!category) {
+            return { error: `"${subSegment}" is not a category under ${genderSegment}.` };
+        }
+        filter.gender = genderSegment;
+        filter.category = category;
+        return { filter };
+    }
+
+    if (genderSegment) {
+        filter.gender = genderSegment;
+        return { filter };
+    }
+    if (categorySegment) {
+        filter.category = categorySegment;
+        return { filter };
+    }
+
+    return { error: `"${segment}" is not a known gender or category.` };
 };
 
-// Get products by category (Public - anyone can access).
-//
-// Optional `subCategory` filter — supplied either as a route param
-// (/category/:categoryName/:subCategory) or as a query string
-// (?subCategory=Boys). Only meaningful for "Kids".
-//
-// Backward-compat: when filtering for "Kids" + "Girls", we also match
-// records where subCategory is missing entirely. That handles any
-// pre-migration documents and keeps them visible to shoppers.
+// Get products by gender and/or category (Public - anyone can access).
 export const getProductsByCategory = async (req, res) => {
     try {
         const { categoryName } = req.params;
-        const subCategoryParam = req.params.subCategory || req.query.subCategory;
+        const subSegment = req.params.subCategory || req.query.subCategory;
 
-        const filter = {
-            category: resolveCategoryFilter(categoryName),
-        };
+        const { filter, error } = buildBrowseFilter(
+            categoryName,
+            subSegment,
+            req.query.gender
+        );
 
-        if (subCategoryParam) {
-            const matchValue = new RegExp(`^${subCategoryParam}$`, 'i');
-            filter.$or = [{ subCategory: matchValue }];
-            if (/^girls$/i.test(subCategoryParam)) {
-                filter.$or.push({ subCategory: null });
-                filter.$or.push({ subCategory: { $exists: false } });
-            }
+        if (error) {
+            /* An unknown segment is an empty result, not a server error — a
+               stale bookmark should render an empty category page, not a 500. */
+            return res.status(200).json({ success: true, count: 0, products: [], message: error });
         }
 
         const products = await Product.find(filter);
@@ -163,10 +247,23 @@ export const getProductsBySpecialTag = async (req, res) => {
     try {
         const { tag } = req.params;
 
-        // Case-insensitive match
-        const products = await Product.find({
-            specialTag: { $regex: new RegExp(`^${tag}$`, 'i') },
-        });
+        /* Special tags are a closed set, so this is an exact lookup against
+           the array field rather than a regex over the old single-value one. */
+        const canonicalTag = SPECIAL_TAGS.find(
+            (t) => t.toLowerCase() === String(tag || "").trim().toLowerCase()
+        );
+
+        if (!canonicalTag) {
+            return res.status(200).json({
+                success: true,
+                count: 0,
+                products: [],
+                message: `"${tag}" is not a special tag.`,
+            });
+        }
+
+        /* Matching a scalar against an array field matches any element. */
+        const products = await Product.find({ specialTags: canonicalTag });
 
         res.status(200).json({
             success: true,
@@ -188,26 +285,27 @@ export const createProduct = async (req, res) => {
     try {
         const {
             name, description, shortDescription, price,
-            category, subCategory, images, colors, variants, specialTag, weight, isCategoryCover,
+            gender, category, images, colors, variants, specialTags, weight, isCategoryCover,
         } = req.body;
 
-        if (!name || !description || !price || !category || !weight) {
+        if (!name || !description || !price || !gender || !category || !weight) {
             return res.status(400).json({
                 success: false,
-                message: "Please provide name, description, price, category, and weight",
+                message: "Please provide name, description, price, gender, category, and weight",
             });
         }
 
-        // Subcategory is required only for Kids — and must be one of
-        // the allowed values when present. Outside Kids the field is
-        // silently ignored (the pre-save hook nulls it).
-        if (category === "Kids") {
-            if (!subCategory || !["Boys", "Girls"].includes(subCategory)) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Kids products must have subCategory set to 'Boys' or 'Girls'.",
-                });
-            }
+        /* Category is nested under gender, so the pair is validated together.
+           The schema enforces this too — this check exists to return a clear
+           400 rather than a ValidationError. */
+        const invalid = validateGenderCategory(gender, category);
+        if (invalid) {
+            return res.status(400).json({ success: false, message: invalid });
+        }
+
+        const tagResult = normalizeSpecialTags(specialTags);
+        if (tagResult.error) {
+            return res.status(400).json({ success: false, message: tagResult.error });
         }
 
         // Validate variant matrix
@@ -219,10 +317,11 @@ export const createProduct = async (req, res) => {
 
         const categoryCover = isCategoryCover === true || isCategoryCover === "true";
 
-        // Auto-unset previous cover in the same category
+        /* Auto-unset previous cover. Scoped to gender + category, since the
+           same category name no longer identifies a listing on its own. */
         if (categoryCover) {
             await Product.updateMany(
-                { category, isCategoryCover: true },
+                { gender, category, isCategoryCover: true },
                 { $set: { isCategoryCover: false } }
             );
         }
@@ -232,13 +331,13 @@ export const createProduct = async (req, res) => {
             shortDescription: shortDescription || "",
             description,
             price,
+            gender,
             category,
-            subCategory: category === "Kids" ? subCategory : null,
             images: images || [],
             colors: colors || [],
             variants: cleanVariants,
             weight,
-            specialTag: specialTag || null,
+            specialTags: tagResult.tags,
             isCategoryCover: categoryCover,
         });
 
@@ -251,6 +350,9 @@ export const createProduct = async (req, res) => {
         });
     } catch (error) {
         console.error("Create Product Error:", error);
+        if (error.name === "ValidationError") {
+            return res.status(400).json({ success: false, message: error.message });
+        }
         res.status(500).json({
             success: false,
             message: "Server error creating product",
@@ -274,12 +376,20 @@ export const updateProduct = async (req, res) => {
 
         const wantsCover = req.body.isCategoryCover === true || req.body.isCategoryCover === "true";
 
-        // If marking as category cover, unset any other cover in that category first.
+        // If marking as category cover, unset any other cover in that
+        // gender + category first — the category name alone no longer
+        // identifies a listing.
         if (wantsCover) {
+            const targetGender = req.body.gender || product.gender;
             const targetCategory = req.body.category || product.category;
-            if (targetCategory) {
+            if (targetGender && targetCategory) {
                 await Product.updateMany(
-                    { category: targetCategory, isCategoryCover: true, _id: { $ne: product._id } },
+                    {
+                        gender: targetGender,
+                        category: targetCategory,
+                        isCategoryCover: true,
+                        _id: { $ne: product._id },
+                    },
                     { $set: { isCategoryCover: false } }
                 );
             }
@@ -303,22 +413,30 @@ export const updateProduct = async (req, res) => {
         // mongoose internals; assign explicitly to known paths instead.
         const assignable = [
             "name", "shortDescription", "description", "price",
-            "category", "subCategory", "weight", "specialTag", "images", "colors",
+            "gender", "category", "weight", "images", "colors",
         ];
         for (const key of assignable) {
             if (req.body[key] !== undefined) product[key] = req.body[key];
         }
         product.isCategoryCover = wantsCover;
 
-        // Validate subCategory against the (possibly updated) category.
-        // The pre-save hook also normalizes this, but a 400 here gives
-        // the admin a clear message instead of silent coercion.
-        if (product.category === "Kids" && !["Boys", "Girls"].includes(product.subCategory)) {
-            return res.status(400).json({
-                success: false,
-                message: "Kids products must have subCategory set to 'Boys' or 'Girls'.",
-            });
+        if (req.body.specialTags !== undefined) {
+            const tagResult = normalizeSpecialTags(req.body.specialTags);
+            if (tagResult.error) {
+                return res.status(400).json({ success: false, message: tagResult.error });
+            }
+            product.specialTags = tagResult.tags;
         }
+
+        /* Validate the pair after assignment, so changing either field alone is
+           still checked against the other's current value. Clearing the
+           reclassification flag is implicit: a product that now has a valid
+           pair is, by definition, classified. */
+        const invalid = validateGenderCategory(product.gender, product.category);
+        if (invalid) {
+            return res.status(400).json({ success: false, message: invalid });
+        }
+        product.needsReclassification = false;
 
         await product.save();
 
@@ -407,12 +525,15 @@ export const searchProducts = async (req, res) => {
             });
         }
 
-        const regex = new RegExp(q.trim(), "i");
+        /* Escaped: this is the one place a raw query string still has to become
+           a RegExp, because free-text search needs substring matching. */
+        const regex = new RegExp(escapeRegex(q.trim()), "i");
 
         const products = await Product.find({
             $or: [
                 { name: regex },
                 { category: regex },
+                { gender: regex },
                 { description: regex },
                 { shortDescription: regex },
             ],
@@ -439,6 +560,9 @@ export const getCategoryCovers = async (req, res) => {
         // Aggregation: for each category, pick the newest product with isCategoryCover=true.
         // If none exists, fall back to the first product in that category.
         const covers = await Product.aggregate([
+            /* Products awaiting manual classification have no category and
+               must not form a null bucket. */
+            { $match: { category: { $exists: true, $ne: null } } },
             { $sort: { createdAt: -1 } },
             {
                 $group: {
@@ -467,7 +591,7 @@ export const getCategoryCovers = async (req, res) => {
         // For categories where coverProduct may contain REMOVE (no cover),
         // we need a second pass: find actual cover products per category
         const coverProducts = await Product.aggregate([
-            { $match: { isCategoryCover: true } },
+            { $match: { isCategoryCover: true, category: { $exists: true, $ne: null } } },
             { $sort: { createdAt: -1 } },
             {
                 $group: {

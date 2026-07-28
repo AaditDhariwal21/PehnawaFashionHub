@@ -9,7 +9,6 @@ import formatPrice from '../utils/formatPrice';
 import { startingPrice, defaultColor, totalStock as variantTotalStock } from '../utils/variants.js';
 import { getDisplayImages } from '../utils/getDisplayImages';
 import { productUrl } from '../utils/productUrl.js';
-import { displayCategory } from '../utils/displayCategory.js';
 import './ComparePage.css';
 import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
@@ -270,10 +269,10 @@ const ComparePage = () => {
                                 <td key={p._id}>
                                     <span
                                         className="compare-attr-pill cursor-pointer"
-                                        onClick={() => navigate(`/products/${encodeURIComponent(displayCategory(p.category))}`)}
+                                        onClick={() => navigate(`/products/${encodeURIComponent(p.gender)}/${encodeURIComponent(p.category)}`)}
                                         style={{ cursor: 'pointer' }}
                                     >
-                                        {displayCategory(p.category)}
+                                        {p.category}
                                     </span>
                                 </td>
                             ))}
@@ -372,7 +371,7 @@ const ComparePage = () => {
                             <th>Tag</th>
                             {products.map((p) => (
                                 <td key={p._id}>
-                                    {p.specialTag ? (
+                                    {p.specialTags?.length > 0 ? (
                                         <span
                                             className="text-xs font-bold uppercase tracking-wider text-white rounded-full"
                                             style={{
@@ -381,7 +380,7 @@ const ComparePage = () => {
                                                 display: 'inline-block',
                                             }}
                                         >
-                                            {p.specialTag}
+                                            {p.specialTags[0]}
                                         </span>
                                     ) : (
                                         <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>—</span>

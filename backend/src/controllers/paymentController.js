@@ -4,6 +4,22 @@ import PendingOrder from "../models/PendingOrder.js";
 import Order from "../models/Order.js";
 import { getShippingRate } from "../services/shippingService.js";
 import { findVariant } from "../utils/variants.js";
+import PromoRedemption from "../models/PromoRedemption.js";
+import {
+    validatePromoForCart,
+    reservePromoCode,
+    releasePromoReservation,
+    confirmPromoRedemption,
+    toPromoLineItem,
+} from "../services/promoService.js";
+import {
+    claimPendingOrder,
+    findOrderBySquareOrderId,
+    isDuplicateSquareOrderError,
+    releasePendingOrderClaim,
+    restoreStock,
+    waitForOrderBySquareOrderId,
+} from "../services/orderCreation.js";
 import crypto from "crypto";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
@@ -12,10 +28,15 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
    POST /api/payments/create-checkout
    ══════════════════════════════════════════════════════════════ */
 export const createCheckoutSession = async (req, res) => {
+    /* Hoisted out of the try so the catch below can hand a claimed promo slot
+       back if anything after the reservation fails. */
+    let reservation = null;
+
     try {
         const {
             cartItems,
             shippingAddress,
+            promoCode,
         } = req.body;
 
         if (!cartItems || cartItems.length === 0) {
@@ -30,6 +51,7 @@ export const createCheckoutSession = async (req, res) => {
         let subtotal = 0;
         let totalWeightLbs = 0;
         const pendingCartItems = [];
+        const promoLineItems = [];
 
         for (const ci of cartItems) {
             const product = await Product.findById(ci.productId);
@@ -79,6 +101,11 @@ export const createCheckoutSession = async (req, res) => {
                 size,
                 quantity: qty,
             });
+
+            /* Promo scoping and discount maths run on server-resolved variant
+               prices, gathered here so the promo service doesn't have to
+               re-query every product. */
+            promoLineItems.push(toPromoLineItem(product, variant.price, qty));
         }
 
         /* ── 2. Calculate shipping server-side (never trust client) ── */
@@ -105,17 +132,102 @@ export const createCheckoutSession = async (req, res) => {
             },
         });
 
-        const totalAmount = subtotal + SHIPPING;
+        /* ── 4. Re-validate the promo code and claim a usage slot ──
+           The "Apply" check in the UI was advisory only: the cart may have
+           changed since, so the rules are re-run here from scratch against
+           server-resolved prices. This is also where the slot is consumed —
+           not at order creation — because this is the moment a customer
+           becomes able to *pay* the discounted amount. Reserving any later
+           would let an over-subscribed code issue discounted payment links to
+           more customers than it has uses, and charging them a discount they
+           weren't entitled to is a refund liability. */
+        let discountAmount = 0;
+        let promoDetails = null;
+
+        if (promoCode) {
+            const validation = await validatePromoForCart({
+                code: promoCode,
+                userId: req.user.id,
+                lineItems: promoLineItems,
+            });
+
+            if (!validation.ok) {
+                return res.status(400).json({
+                    success: false,
+                    code: validation.code,
+                    message: validation.message,
+                });
+            }
+
+            const reserved = await reservePromoCode({
+                promo: validation.promo,
+                userId: req.user.id,
+                discountAmount: validation.discountAmount,
+                squareOrderId: null,
+            });
+
+            if (!reserved.ok) {
+                return res.status(400).json({
+                    success: false,
+                    code: reserved.code,
+                    message: reserved.message,
+                });
+            }
+
+            reservation = reserved.redemption;
+            discountAmount = validation.discountAmount;
+            promoDetails = {
+                promoCodeId: validation.promo._id,
+                code: validation.promo.code,
+                discountType: validation.promo.discountType,
+            };
+        }
+
+        const totalAmount = Math.round((subtotal - discountAmount + SHIPPING) * 100) / 100;
+
+        /* The discount is capped at the eligible subtotal, so shipping always
+           remains payable and this can't reach zero — but a payment link for
+           $0 would be rejected by Square, so fail loudly rather than sending
+           a malformed order. */
+        if (totalAmount <= 0) {
+            if (reservation) await releasePromoReservation({ redemptionId: reservation._id });
+            return res.status(400).json({
+                success: false,
+                message: "Order total must be greater than zero.",
+            });
+        }
+
         const idempotencyKey = crypto.randomUUID();
 
-        /* ── 4. Create Square payment link ── */
-        const locationId = await getLocationId();
+        /* ── 5. Create Square payment link ──
+           The discount goes to Square as an order-level fixed amount rather
+           than a percentage, so Square charges exactly the figure computed
+           above. It must be represented here: the confirmation and webhook
+           paths both assert that the amount Square captured equals
+           PendingOrder.totalAmount, and would otherwise reject every
+           discounted order. */
+        const squareOrder = {
+            locationId: await getLocationId(),
+            lineItems,
+        };
+
+        if (discountAmount > 0) {
+            squareOrder.discounts = [
+                {
+                    uid: "PROMO",
+                    name: `Promo ${promoDetails.code}`,
+                    amountMoney: {
+                        amount: BigInt(Math.round(discountAmount * 100)),
+                        currency: "USD",
+                    },
+                    scope: "ORDER",
+                },
+            ];
+        }
+
         const response = await squareClient.checkout.paymentLinks.create({
             idempotencyKey,
-            order: {
-                locationId,
-                lineItems,
-            },
+            order: squareOrder,
             checkoutOptions: {
                 redirectUrl: `${FRONTEND_URL}/order-confirmation`,
                 askForShippingAddress: false,
@@ -125,13 +237,24 @@ export const createCheckoutSession = async (req, res) => {
         const paymentLink = response.paymentLink;
 
         if (!paymentLink?.url) {
+            if (reservation) await releasePromoReservation({ redemptionId: reservation._id });
             return res.status(500).json({
                 success: false,
                 message: "Failed to create Square checkout session.",
             });
         }
 
-        /* ── 5. Store pending order for later confirmation ── */
+        /* Bind the reservation to the Square order now that we have its id —
+           this is the key that lets the confirmation and webhook paths find
+           and confirm it later. */
+        if (reservation) {
+            await PromoRedemption.updateOne(
+                { _id: reservation._id },
+                { $set: { squareOrderId: paymentLink.orderId } }
+            );
+        }
+
+        /* ── 6. Store pending order for later confirmation ── */
         await PendingOrder.create({
             userId: req.user.id,
             paymentLinkId: paymentLink.id,
@@ -139,6 +262,8 @@ export const createCheckoutSession = async (req, res) => {
             cartItems: pendingCartItems,
             shippingAddress,
             subtotal,
+            discountAmount,
+            promo: promoDetails ?? undefined,
             shippingCost: SHIPPING,
             totalAmount,
         });
@@ -147,9 +272,30 @@ export const createCheckoutSession = async (req, res) => {
             success: true,
             checkoutUrl: paymentLink.url,
             squareOrderId: paymentLink.orderId,
+            /* Server-computed breakdown — the authoritative figures the
+               customer is about to be charged. */
+            summary: {
+                subtotal,
+                discountAmount,
+                shippingCost: SHIPPING,
+                totalAmount,
+                promoCode: promoDetails?.code ?? null,
+            },
         });
     } catch (error) {
         console.error("createCheckoutSession error:", error);
+
+        /* A claimed promo slot must not outlive a checkout that failed to
+           reach the customer — otherwise a limited code bleeds uses on every
+           Square or database error. */
+        if (reservation) {
+            try {
+                await releasePromoReservation({ redemptionId: reservation._id });
+            } catch (releaseErr) {
+                console.error("createCheckoutSession promo release error:", releaseErr);
+            }
+        }
+
         return res.status(500).json({
             success: false,
             message: "Server error creating checkout session.",
@@ -241,12 +387,32 @@ export const confirmPayment = async (req, res) => {
         }
 
         /* ── 2. Idempotency: check if order already created for this Square order ── */
-        const existingOrder = await Order.findOne({
-            "paymentResult.squareOrderId": pending.squareOrderId,
-        });
+        const existingOrder = await findOrderBySquareOrderId(pending.squareOrderId);
         if (existingOrder) {
             await PendingOrder.deleteOne({ _id: pending._id });
             return res.json({ success: true, order: existingOrder });
+        }
+
+        /* ── 2b. Take the processing lease before doing any real work ──
+           The check above is not sufficient on its own: the Square webhooks fire
+           for this same payment at roughly the moment the customer is redirected
+           here, and everything between that check and Order.create takes long
+           enough for two triggers to both pass it. Claiming here means the loser
+           stops before making a Square call or touching stock. */
+        const claimed = await claimPendingOrder(pending._id);
+        if (!claimed) {
+            /* Another trigger is mid-flight. Give it a moment and return the
+               order it creates, so losing the race is invisible to the customer. */
+            const order = await waitForOrderBySquareOrderId(pending.squareOrderId);
+            if (order) {
+                await PendingOrder.deleteOne({ _id: pending._id });
+                return res.json({ success: true, order });
+            }
+            return res.status(409).json({
+                success: false,
+                code: "ORDER_IN_PROGRESS",
+                message: "Your payment is still being processed. This will update shortly.",
+            });
         }
 
         /* ── 3. Verify payment with Square API ── */
@@ -257,6 +423,9 @@ export const confirmPayment = async (req, res) => {
             });
         } catch (sqErr) {
             console.error("Square order fetch error:", sqErr);
+            /* Transient — release the lease so the retry this implies isn't
+               blocked waiting for it to expire. */
+            await releasePendingOrderClaim(pending._id);
             return res.status(500).json({
                 success: false,
                 message: "Unable to verify payment with Square.",
@@ -267,6 +436,9 @@ export const confirmPayment = async (req, res) => {
         const tenders = squareOrder?.tenders || [];
 
         if (tenders.length === 0) {
+            /* This response explicitly asks the customer to try again, so the
+               lease must not still be held when they do. */
+            await releasePendingOrderClaim(pending._id);
             return res.status(400).json({
                 success: false,
                 message: "Payment has not been completed yet. Please try again.",
@@ -339,25 +511,68 @@ export const confirmPayment = async (req, res) => {
 
         const squarePaymentId = tenders[0]?.id || "";
 
-        const order = await Order.create({
-            user: req.user.id,
-            items: orderItems,
-            shippingAddress: pending.shippingAddress,
-            paymentMethod: "Square",
-            paymentResult: {
-                squareOrderId: pending.squareOrderId,
-                squarePaymentId,
-                status: "COMPLETED",
-            },
-            subtotal: pending.subtotal,
-            shippingCost: pending.shippingCost,
-            totalAmount: pending.totalAmount,
-            orderStatus: "Paid",
-            isPaid: true,
-            paidAt: new Date(),
+        let order;
+        try {
+            order = await Order.create({
+                user: req.user.id,
+                items: orderItems,
+                shippingAddress: pending.shippingAddress,
+                paymentMethod: "Square",
+                paymentResult: {
+                    squareOrderId: pending.squareOrderId,
+                    squarePaymentId,
+                    status: "COMPLETED",
+                },
+                subtotal: pending.subtotal,
+                discountAmount: pending.discountAmount || 0,
+                promo: pending.promo?.code ? pending.promo : undefined,
+                shippingCost: pending.shippingCost,
+                totalAmount: pending.totalAmount,
+                orderStatus: "Paid",
+                isPaid: true,
+                paidAt: new Date(),
+            });
+        } catch (createErr) {
+            /* Whatever went wrong, stock has been deducted for an order that
+               does not exist. Give it back first. */
+            await restoreStock(resolved);
+
+            /* Backstop fired: the unique index on paymentResult.squareOrderId
+               rejected this insert because another trigger got there first,
+               despite the lease. Return the order that did win.
+
+               Deliberately narrow — a collision on the other unique index
+               (orderId) is a real fault, not a duplicate payment, and must not
+               be reported to the customer as "already processing" when no order
+               exists. Letting it throw surfaces it and lets the retry succeed
+               with a freshly generated id. */
+            if (isDuplicateSquareOrderError(createErr)) {
+                const winner = await findOrderBySquareOrderId(pending.squareOrderId);
+                await PendingOrder.deleteOne({ _id: pending._id });
+                if (winner) {
+                    return res.json({ success: true, order: winner });
+                }
+                return res.status(409).json({
+                    success: false,
+                    code: "ORDER_IN_PROGRESS",
+                    message: "Your payment is still being processed. This will update shortly.",
+                });
+            }
+
+            /* Release the lease so the customer's retry isn't blocked. */
+            await releasePendingOrderClaim(pending._id);
+            throw createErr;
+        }
+
+        /* ── 8. Promote the promo reservation to a confirmed redemption.
+           Idempotent, because the Square webhook races this handler for the
+           same order — whichever arrives second is a no-op. */
+        await confirmPromoRedemption({
+            squareOrderId: pending.squareOrderId,
+            orderId: order._id,
         });
 
-        /* ── 8. Clean up pending order ── */
+        /* ── 9. Clean up pending order ── */
         await PendingOrder.deleteOne({ _id: pending._id });
 
         return res.status(201).json({ success: true, order });

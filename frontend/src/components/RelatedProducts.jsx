@@ -178,7 +178,7 @@ const RelatedProducts = ({ currentProduct }) => {
                                                 name: product.name,
                                                 image: imageUrl || '',
                                                 price,
-                                                category: product.category,
+                                                gender: product.gender, category: product.category,
                                             });
                                         }}
                                         className="absolute bottom-2.5 left-2.5 w-11 h-11 sm:w-7 sm:h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"
@@ -194,7 +194,7 @@ const RelatedProducts = ({ currentProduct }) => {
                                     </button>
 
                                     {/* Special tag */}
-                                    {product.specialTag && (
+                                    {product.specialTags?.length > 0 && (
                                         <span
                                             className="absolute top-2.5 left-2.5 text-xs font-bold uppercase tracking-wider text-white rounded-full"
                                             style={{
@@ -203,7 +203,7 @@ const RelatedProducts = ({ currentProduct }) => {
                                                 fontSize: '0.6rem',
                                             }}
                                         >
-                                            {product.specialTag}
+                                            {product.specialTags[0]}
                                         </span>
                                     )}
                                 </div>

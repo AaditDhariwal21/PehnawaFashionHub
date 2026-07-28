@@ -9,7 +9,6 @@ import formatPrice from '../utils/formatPrice';
 import { findVariant, startingPrice, displayPrice, hasDiscount, defaultColor, totalStock as variantTotalStock } from '../utils/variants.js';
 import { getDisplayImages } from '../utils/getDisplayImages';
 import { productUrl } from '../utils/productUrl.js';
-import { displayCategory } from '../utils/displayCategory.js';
 import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
 const API = import.meta.env.VITE_API_URL;
@@ -256,12 +255,12 @@ const WishlistPage = () => {
                                             </button>
 
                                             {/* Special tag */}
-                                            {product.specialTag && (
+                                            {product.specialTags?.length > 0 && (
                                                 <span
                                                     className="absolute top-3 left-3 text-xs font-bold uppercase tracking-wider text-white rounded-full"
                                                     style={{ padding: '0.3rem 0.75rem', background: 'linear-gradient(135deg, #EFBF04, #d4a904)' }}
                                                 >
-                                                    {product.specialTag}
+                                                    {product.specialTags[0]}
                                                 </span>
                                             )}
 
@@ -280,7 +279,7 @@ const WishlistPage = () => {
                                         <div style={{ padding: '1rem 1rem 1.15rem' }}>
                                             {/* Category */}
                                             <p className="uppercase tracking-wider text-gray-400 truncate" style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.08em', marginBottom: '0.25rem' }}>
-                                                {displayCategory(product.category)}
+                                                {product.category}
                                             </p>
 
                                             {/* Name */}

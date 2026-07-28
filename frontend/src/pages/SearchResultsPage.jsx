@@ -167,8 +167,8 @@ const SearchResultsPage = () => {
                                                 }}
                                             />
                                         </button>
-                                        {product.specialTag && (
-                                            <span className="search-results__card-tag">{product.specialTag}</span>
+                                        {product.specialTags?.length > 0 && (
+                                            <span className="search-results__card-tag">{product.specialTags[0]}</span>
                                         )}
                                         {/* Compare toggle */}
                                         <button
@@ -179,7 +179,7 @@ const SearchResultsPage = () => {
                                                     name: product.name,
                                                     image: imageUrl || '',
                                                     price: startingPrice(product),
-                                                    category: product.category,
+                                                    gender: product.gender, category: product.category,
                                                 });
                                             }}
                                             className="absolute bottom-3 left-3 w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-pointer border-none shadow-sm transition-all hover:scale-110"

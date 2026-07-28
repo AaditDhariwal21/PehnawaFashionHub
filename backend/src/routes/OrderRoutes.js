@@ -1,6 +1,5 @@
 import express from "express";
 import {
-    createOrder,
     getMyOrders,
     getAllOrders,
     getOrderById,
@@ -12,8 +11,8 @@ import { verifyToken, isAdmin } from "../middlewares/AuthMiddleware.js";
 
 const router = express.Router();
 
-// POST   /api/orders                         → Create order  (any authenticated user)
-router.post("/", verifyToken, createOrder);
+/* There is no POST /api/orders. Orders are created only after Square confirms
+   payment, via the two routes below and the payment.updated webhook. */
 
 // POST   /api/orders/confirm-square-payment  → Verify Square payment & create order
 router.post("/confirm-square-payment", verifyToken, confirmPayment);

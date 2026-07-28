@@ -8,14 +8,17 @@ import formatPrice from '../utils/formatPrice';
 import VariantMatrix from '../components/VariantMatrix';
 import ColorImagesManager, { finalizeColors } from '../components/ColorImagesManager';
 import { buildVariantMatrix, totalStock as variantTotalStock } from '../utils/variants.js';
-import { displayCategory } from '../utils/displayCategory.js';
+import { GENDERS, ALL_CATEGORIES, SPECIAL_TAGS, categoriesForGender } from '../utils/productCategories.js';
 import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-const categories = ['Anarkalis', 'Coord Sets', 'Lehangas', 'Indo Western', 'Suits & Kurtis', 'Sarees', 'Blouses', 'Kids', "Men's Kurta", 'Dupattas', 'Pashminas'];
-const KIDS_SUBCATEGORIES = ['Boys', 'Girls'];
-const specialTags = ['', 'New Arrival', 'Best Seller', 'Sale', 'Trending'];
+/* This file previously carried its own verbatim copy of the category list
+   instead of importing the shared one, which is exactly how it would have
+   drifted. Everything now comes from utils/productCategories.js. */
+
+/* Sentinel filter value — not a category, so it can't collide with one. */
+const NEEDS_CLASSIFICATION = '__NEEDS_CLASSIFICATION__';
 
 const quillModules = {
     toolbar: [
@@ -36,25 +39,17 @@ const quillFormats = ['bold', 'italic', 'underline', 'list', 'link'];
 const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
     /* ── Form fields, initialised straight from `product` ── */
     const [formData, setFormData] = useState(() => {
-        // Normalize legacy "Kidswear" records to "Kids" on load so the
-        // category dropdown has a matching option (Kidswear is no
-        // longer in the list). Saving the form persists the
-        // normalized value, which finishes the migration for that
-        // single record.
-        const normalizedCategory = displayCategory(product.category || '');
-        const isKids = normalizedCategory === 'Kids';
+        // A product awaiting manual classification has neither field set, so
+        // both selects open empty and the admin must choose — which is the
+        // point. Saving a valid pair clears needsReclassification server-side.
         return {
             name: product.name || '',
             shortDescription: product.shortDescription || '',
             description: product.description || '',
             price: product.price ?? '',
-            category: normalizedCategory,
-            // Backward-compat: a Kids product with no subCategory is
-            // treated as "Girls" so the dropdown shows a valid
-            // selection for legacy records the admin opens before
-            // running the migration script.
-            subCategory: product.subCategory || (isKids ? 'Girls' : ''),
-            specialTag: product.specialTag || '',
+            gender: product.gender || '',
+            category: product.category || '',
+            specialTags: Array.isArray(product.specialTags) ? product.specialTags : [],
             weight: product.weight ?? '',
             isCategoryCover: !!product.isCategoryCover,
         };
@@ -117,9 +112,10 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
         const { name, value } = e.target;
         setFormData((p) => {
             const next = { ...p, [name]: value };
-            // Switching away from Kids must drop any stale subCategory
-            // so we don't post Boys/Girls alongside a non-Kids product.
-            if (name === 'category' && value !== 'Kids') next.subCategory = '';
+            /* Category is scoped to gender, so changing gender invalidates any
+               category already selected — clearing it is what keeps an invalid
+               pair unreachable through the UI. */
+            if (name === 'gender' && value !== p.gender) next.category = '';
             return next;
         });
     };
@@ -184,8 +180,8 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
                 stock: Math.max(0, Number(v.stock) || 0),
             }));
 
-            if (formData.category === 'Kids' && !KIDS_SUBCATEGORIES.includes(formData.subCategory)) {
-                setError('Please select a subcategory (Boys or Girls) for Kids products.');
+            if (!formData.gender || !formData.category) {
+                setError('Please select both a gender and a category.');
                 setIsLoading(false);
                 return;
             }
@@ -195,10 +191,10 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
                 shortDescription: formData.shortDescription,
                 description: formData.description,
                 price: Number(formData.price),
+                gender: formData.gender,
                 category: formData.category,
-                subCategory: formData.category === 'Kids' ? formData.subCategory : null,
                 weight: Number(formData.weight) || 0,
-                specialTag: formData.specialTag || null,
+                specialTags: formData.specialTags,
                 isCategoryCover: formData.isCategoryCover,
                 images: finalColors[0].images,
                 colors: finalColors,
@@ -298,19 +294,54 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
                                 </div>
                                 <div><label className={labelCls}>Weight (lbs) *</label><input type="number" name="weight" value={formData.weight} onChange={handleInputChange} min="0.01" step="0.01" className={inputCls} style={inputPad} /></div>
                             </div>
+                            {/* Gender gates the category list — an invalid pair is
+                                unreachable here, not merely rejected on save. */}
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className={labelCls}>Category *</label><select name="category" value={formData.category} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}><option value="">Select</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                                <div><label className={labelCls}>Special Tag</label><select name="specialTag" value={formData.specialTag} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}><option value="">None</option>{specialTags.filter(Boolean).map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                            </div>
-                            {formData.category === 'Kids' && (
                                 <div>
-                                    <label className={labelCls}>Subcategory *</label>
-                                    <select name="subCategory" value={formData.subCategory} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}>
-                                        <option value="">Select Boys or Girls</option>
-                                        {KIDS_SUBCATEGORIES.map((s) => <option key={s} value={s}>{s}</option>)}
+                                    <label className={labelCls}>Gender *</label>
+                                    <select name="gender" value={formData.gender} onChange={handleInputChange} className={`${inputCls} cursor-pointer`} style={inputPad}>
+                                        <option value="">Select</option>
+                                        {GENDERS.map(g => <option key={g} value={g}>{g}</option>)}
                                     </select>
                                 </div>
-                            )}
+                                <div>
+                                    <label className={labelCls}>Category *</label>
+                                    <select
+                                        name="category"
+                                        value={formData.category}
+                                        onChange={handleInputChange}
+                                        disabled={!formData.gender}
+                                        className={`${inputCls} ${formData.gender ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                                        style={inputPad}
+                                    >
+                                        <option value="">{formData.gender ? 'Select' : 'Select a gender first'}</option>
+                                        {categoriesForGender(formData.gender).map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Independent multi-value facet — not a category. */}
+                            <div>
+                                <label className={labelCls}>Special Tags</label>
+                                <div className="flex flex-wrap gap-4 mt-1">
+                                    {SPECIAL_TAGS.map((tag) => (
+                                        <label key={tag} className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.specialTags.includes(tag)}
+                                                onChange={(e) => setFormData(p => ({
+                                                    ...p,
+                                                    specialTags: e.target.checked
+                                                        ? [...p.specialTags, tag]
+                                                        : p.specialTags.filter(t => t !== tag),
+                                                }))}
+                                                className="w-4 h-4 rounded cursor-pointer accent-amber-500"
+                                            />
+                                            <span className="text-xs text-gray-600">{tag}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
 
                             {formData.category && (
                                 <label className="flex items-center gap-2 cursor-pointer" style={{ marginTop: '-0.5rem' }}>
@@ -399,6 +430,11 @@ const AdminManageProducts = () => {
 
     /* ── Filtered products ── */
     const filtered = useMemo(() => products.filter(p => {
+        /* Products the migration could not classify have no category, so they
+           would be invisible under every category filter. Give them their own
+           filter value instead — this is the admin-side counterpart to
+           db.products.find({ needsReclassification: true }). */
+        if (categoryFilter === NEEDS_CLASSIFICATION) return !!p.needsReclassification;
         if (categoryFilter && p.category !== categoryFilter) return false;
         if (searchQuery) {
             const q = searchQuery.toLowerCase();
@@ -510,7 +546,8 @@ const AdminManageProducts = () => {
                         style={{ padding: '9px 14px' }}
                     >
                         <option value="">All Categories</option>
-                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        {ALL_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        <option value={NEEDS_CLASSIFICATION}>⚠ Needs classification</option>
                     </select>
 
                     <div className="flex-1" />
@@ -607,7 +644,7 @@ const AdminManageProducts = () => {
 
                                         <p className="text-sm font-medium text-gray-900 truncate cursor-pointer" onClick={() => setEditProduct(product)}>{product.name}</p>
 
-                                        <span className="text-sm text-gray-500">{displayCategory(product.category)}{product.subCategory ? ` / ${product.subCategory}` : ''}</span>
+                                        <span className={`text-sm ${product.needsReclassification ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>{product.needsReclassification ? '⚠ Needs classification' : `${product.gender} / ${product.category}`}</span>
 
                                         <span className="text-sm font-semibold text-gray-800 text-right">{formatPrice(product.price)}</span>
 
@@ -657,7 +694,7 @@ const AdminManageProducts = () => {
 
                                         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setEditProduct(product)}>
                                             <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-                                            <p className="text-xs text-gray-500 truncate mt-0.5">{displayCategory(product.category)}{product.subCategory ? ` / ${product.subCategory}` : ''}</p>
+                                            <p className={`text-xs truncate mt-0.5 ${product.needsReclassification ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>{product.needsReclassification ? '⚠ Needs classification' : `${product.gender} / ${product.category}`}</p>
                                             <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1 mt-1.5">
                                                 <span className="text-sm font-semibold text-gray-800">{formatPrice(product.price)}</span>
                                                 <span className="text-xs text-gray-400">Stock: {stock}</span>

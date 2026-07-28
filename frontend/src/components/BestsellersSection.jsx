@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import ProductCarousel from './ProductCarousel';
 
 /*
- * Bestsellers — home-page rail of products tagged "Best Seller".
+ * Bestsellers — home-page rail of products tagged "Bestseller" in specialTags.
  * Reuses the shared ProductCarousel (same conveyor animation and card as
  * New Arrivals). It is the yellow band in the alternating home-page
  * theme, sitting between New Arrivals (white) and Shop by Category
@@ -16,7 +16,7 @@ const BestsellersSection = () => {
         const fetchProducts = async () => {
             try {
                 const response = await fetch(
-                    `${import.meta.env.VITE_API_URL}/products/tag/${encodeURIComponent('Best Seller')}`
+                    `${import.meta.env.VITE_API_URL}/products/tag/${encodeURIComponent('Bestseller')}`
                 );
                 const data = await response.json();
                 if (data.success) {

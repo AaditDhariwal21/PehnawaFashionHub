@@ -4,6 +4,14 @@ import Product from "../models/Products.js";
 import PendingOrder from "../models/PendingOrder.js";
 import Order from "../models/Order.js";
 import { findVariant } from "../utils/variants.js";
+import { confirmPromoRedemption } from "../services/promoService.js";
+import {
+    claimPendingOrder,
+    findOrderBySquareOrderId,
+    isDuplicateSquareOrderError,
+    releasePendingOrderClaim,
+    restoreStock,
+} from "../services/orderCreation.js";
 
 const SIGNATURE_KEY = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY || "";
 const WEBHOOK_URL = process.env.SQUARE_WEBHOOK_URL || "";
@@ -75,12 +83,13 @@ export const handleSquareWebhook = async (req, res) => {
     }
 
     try {
-        /* ── 6. Idempotency: check if order already exists ── */
-        const existingOrder = await Order.findOne({
-            "paymentResult.squarePaymentId": squarePaymentId,
-        });
+        /* ── 6. Idempotency: check if order already exists ──
+           Keyed on squareOrderId, matching confirmPayment(). It used to key on
+           squarePaymentId, which meant the two triggers consulted different
+           fields and neither could be read as the definitive answer. */
+        const existingOrder = await findOrderBySquareOrderId(squareOrderId);
         if (existingOrder) {
-            console.log(`[Webhook] Order already exists for payment ${squarePaymentId} — skipping.`);
+            console.log(`[Webhook] Order already exists for Square order ${squareOrderId} — skipping.`);
             return res.status(200).send("OK");
         }
 
@@ -91,12 +100,28 @@ export const handleSquareWebhook = async (req, res) => {
             return res.status(200).send("OK");
         }
 
+        /* ── 7b. Take the processing lease before doing any real work ──
+           Square delivers both payment.created and payment.updated for a payment
+           link, commonly both COMPLETED, and the customer's confirm request
+           arrives around the same time. The check above cannot separate them:
+           everything from here to Order.create takes long enough that several
+           triggers would all pass it. Claiming here means only one does the
+           Square call and the stock deduction. */
+        const claimed = await claimPendingOrder(pending._id);
+        if (!claimed) {
+            console.log(`[Webhook] Square order ${squareOrderId} is already being processed — skipping.`);
+            return res.status(200).send("OK");
+        }
+
         /* ── 8. Verify payment amount matches expected total ── */
         let squareOrderData;
         try {
             squareOrderData = await squareClient.orders.get({ orderId: squareOrderId });
         } catch (sqErr) {
             console.error(`[Webhook] Failed to fetch Square order ${squareOrderId}:`, sqErr.message);
+            /* Transient — release the lease so Square's redelivery (or the
+               customer's confirm request) can pick this up immediately. */
+            await releasePendingOrderClaim(pending._id);
             return res.status(200).send("OK");
         }
 
@@ -188,25 +213,53 @@ export const handleSquareWebhook = async (req, res) => {
             quantity: r.qty,
         }));
 
-        const order = await Order.create({
-            user: pending.userId,
-            items: orderItems,
-            shippingAddress: pending.shippingAddress,
-            paymentMethod: "Square",
-            paymentResult: {
-                squareOrderId,
-                squarePaymentId,
-                status: "COMPLETED",
-            },
-            subtotal: pending.subtotal,
-            shippingCost: pending.shippingCost,
-            totalAmount: pending.totalAmount,
-            orderStatus: "Paid",
-            isPaid: true,
-            paidAt: new Date(),
+        let order;
+        try {
+            order = await Order.create({
+                user: pending.userId,
+                items: orderItems,
+                shippingAddress: pending.shippingAddress,
+                paymentMethod: "Square",
+                paymentResult: {
+                    squareOrderId,
+                    squarePaymentId,
+                    status: "COMPLETED",
+                },
+                subtotal: pending.subtotal,
+                discountAmount: pending.discountAmount || 0,
+                promo: pending.promo?.code ? pending.promo : undefined,
+                shippingCost: pending.shippingCost,
+                totalAmount: pending.totalAmount,
+                orderStatus: "Paid",
+                isPaid: true,
+                paidAt: new Date(),
+            });
+        } catch (createErr) {
+            /* Backstop fired, or the insert failed for some other reason. Either
+               way stock has already been deducted for an order that does not
+               exist, so give it back before bailing out. */
+            await restoreStock(resolved);
+
+            if (isDuplicateSquareOrderError(createErr)) {
+                console.log(`[Webhook] Order for Square order ${squareOrderId} already created by another trigger — stock restored, skipping.`);
+            } else {
+                /* Not a duplicate payment — a genuine failure. Release the lease
+                   so Square's redelivery can retry rather than waiting it out. */
+                console.error(`[Webhook] Order creation failed for ${squareOrderId} — stock restored:`, createErr);
+                await releasePendingOrderClaim(pending._id);
+            }
+            return res.status(200).send("OK");
+        }
+
+        /* ── 12. Promote the promo reservation to a confirmed redemption.
+           Idempotent — confirmPayment() races this handler for the same order
+           and whichever arrives second is a no-op. */
+        await confirmPromoRedemption({
+            squareOrderId,
+            orderId: order._id,
         });
 
-        /* ── 12. Clean up pending order ── */
+        /* ── 13. Clean up pending order ── */
         await PendingOrder.deleteOne({ _id: pending._id });
 
         console.log(`[Webhook] Order ${order.orderId} created for payment ${squarePaymentId}`);

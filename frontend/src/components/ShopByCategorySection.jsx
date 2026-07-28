@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CloudinaryImage from './CloudinaryImage.jsx';
+import { ALL_CATEGORIES } from '../utils/productCategories.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -8,20 +9,11 @@ const ShopByCategorySection = () => {
     const navigate = useNavigate();
     const [covers, setCovers] = useState({});
 
-    const categories = [
-        { id: 1, name: 'New Arrivals' },
-        { id: 2, name: 'Anarkalis' },
-        { id: 3, name: 'Coord Sets' },
-        { id: 4, name: 'Lehangas' },
-        { id: 5, name: 'Indo Western' },
-        { id: 6, name: 'Suits & Kurtis' },
-        { id: 7, name: 'Sarees' },
-        { id: 8, name: 'Blouses' },
-        { id: 9, name: 'Kids' },
-        { id: 10, name: "Men's Kurta" },
-        { id: 11, name: 'Dupattas' },
-        { id: 12, name: 'Pashminas' },
-    ];
+    /* Derived from the shared taxonomy, not a hand-maintained list. That drops
+       "New Arrivals" — which was never a category, only a special tag, so the
+       tile led to an empty page — and "Pashminas", now merged into Dupattas.
+       Layout is unchanged; only the data source is. */
+    const categories = ALL_CATEGORIES.map((name) => ({ id: name, name }));
 
     useEffect(() => {
         const fetchCovers = async () => {
@@ -60,16 +52,16 @@ const ShopByCategorySection = () => {
             </h2>
 
             {/*
-                Column counts are all divisors of the 12 categories, so
-                every row is completely full at every breakpoint — no
-                left-aligned remainder on a partial last row:
-                  default : 2 cols × 6 rows
-                  ≥640px  : 3 cols × 4 rows
-                  ≥768px  : 4 cols × 3 rows
-                  ≥1024px : 6 cols × 2 rows
-                Grid `1fr` tracks stretch the tiles to fill the row, and the
-                wide max-width keeps the tiles large without side gutters up
-                to ~1800px.
+                Column counts are 2 / 3 / 4 / 6 across the breakpoints. The tile
+                count is no longer hardcoded — it is however many categories the
+                taxonomy declares — so the "every row is exactly full" property
+                is no longer guaranteed by construction. It happens to hold at
+                the current count of 12, which all four column counts divide.
+
+                If a future category count leaves a remainder, the final row
+                simply left-aligns, which is normal for a product grid. Grid
+                `1fr` tracks stretch the tiles to fill the row, and the wide
+                max-width keeps them large without side gutters up to ~1800px.
             */}
             <div
                 className="

@@ -43,7 +43,7 @@ export const CompareProvider = ({ children }) => {
      * @returns {boolean} true if added, false if limit reached or duplicate
      */
     const addToCompare = useCallback(
-        ({ productId, name, image, price, category }) => {
+        ({ productId, name, image, price, gender, category }) => {
             // Duplicate guard
             if (compareItems.some((i) => i.productId === productId)) return false;
 
@@ -55,7 +55,7 @@ export const CompareProvider = ({ children }) => {
                 return false;
             }
 
-            setCompareItems((prev) => [...prev, { productId, name, image, price, category }]);
+            setCompareItems((prev) => [...prev, { productId, name, image, price, gender, category }]);
             return true;
         },
         [compareItems]

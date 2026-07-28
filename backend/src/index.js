@@ -19,6 +19,7 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
 import userRoutes from "./routes/UserRoute.js";
 import wishlistRoutes from "./routes/WishlistRoute.js";
+import promoRoutes from "./routes/PromoRoute.js";
 
 const app = express();
 
@@ -79,6 +80,7 @@ app.use("/api/shipping", shippingRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/wishlist", wishlistRoutes);
+app.use("/api/promo", promoRoutes);
 
 /* ---------------- Global Error Handler ---------------- */
 

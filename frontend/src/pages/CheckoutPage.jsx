@@ -8,6 +8,8 @@ import { useAuth } from '../context/AuthContext';
 import formatPrice from '../utils/formatPrice';
 import './CheckoutPage.css';
 import CloudinaryImage from '../components/CloudinaryImage.jsx';
+import PromoCodeInput from '../components/PromoCodeInput.jsx';
+import { promoErrorMessage } from '../utils/promoErrors';
 
 const FALLBACK_SHIPPING = 8;
 const API = import.meta.env.VITE_API_URL;
@@ -23,10 +25,13 @@ const REQUIRED_FIELDS = [
 
 const CheckoutPage = () => {
     const navigate = useNavigate();
-    const { cartItems, getSubtotal, clearCart, buyNowItem, clearBuyNowItem } = useCart();
+    const { cartItems, getSubtotal, clearCart, buyNowItem, clearBuyNowItem, appliedPromo } = useCart();
     const { user } = useAuth();
     const [placing, setPlacing] = useState(false);
     const [errors, setErrors] = useState({});
+    /* Set when create-checkout rejects the promo at the last moment — the cart
+       can drift between Apply and Pay, and the server has the final word. */
+    const [promoError, setPromoError] = useState('');
 
     /* ── Shipping rate state ── */
     const [shippingCost, setShippingCost] = useState(null);
@@ -42,7 +47,13 @@ const CheckoutPage = () => {
         ? buyNowItem.price * buyNowItem.quantity
         : getSubtotal();
     const shippingKnown = shippingCost !== null;
-    const total = subtotal + (shippingKnown ? shippingCost : 0);
+
+    /* Both components of the total are server-computed: the discount comes
+       from /api/promo/validate and the shipping rate from /api/shipping/rates.
+       Nothing here derives a discount locally, and create-checkout recomputes
+       the whole total independently before charging anything. */
+    const discountAmount = appliedPromo?.discountAmount ?? 0;
+    const total = subtotal - discountAmount + (shippingKnown ? shippingCost : 0);
 
     /* ── Abort controller ref to cancel in-flight requests ── */
     const abortRef = useRef(null);
@@ -180,6 +191,7 @@ const CheckoutPage = () => {
         }
 
         setPlacing(true);
+        setPromoError('');
 
         try {
             const token = localStorage.getItem('token');
@@ -210,7 +222,14 @@ const CheckoutPage = () => {
                         quantity: ci.quantity,
                     })),
                     shippingAddress,
-                    shippingCost,
+                    /* No money fields are sent. shippingCost used to be
+                       included here and silently ignored by the server, which
+                       invited someone to "helpfully" start trusting it; the
+                       rate is recalculated server-side from the address and
+                       product weights. Likewise only the promo *code* travels —
+                       the server re-validates it and recomputes the discount
+                       from the cart it resolves. */
+                    promoCode: appliedPromo?.code,
                 }),
             });
 
@@ -221,6 +240,11 @@ const CheckoutPage = () => {
                     sessionStorage.setItem('pehnawa_squareOrderId', data.squareOrderId);
                 }
                 window.location.href = data.checkoutUrl;
+            } else if (data.code?.startsWith('PROMO_')) {
+                /* The code stopped being valid between Apply and Pay. Show the
+                   specific reason inline instead of an opaque alert, and leave
+                   the order un-placed so the customer can drop the code. */
+                setPromoError(promoErrorMessage(data, formatPrice));
             } else {
                 alert(data.message || 'Failed to create checkout session.');
             }
@@ -673,6 +697,48 @@ const CheckoutPage = () => {
                             <span>Subtotal</span>
                             <span style={{ color: '#374151', fontWeight: 500 }}>{formatPrice(subtotal)}</span>
                         </div>
+
+                        {/* Promo code */}
+                        <div style={{ margin: '0.9rem 0' }}>
+                            <PromoCodeInput checkoutItems={checkoutItems} disabled={placing} />
+                            {promoError && (
+                                <p
+                                    role="alert"
+                                    style={{
+                                        fontSize: '0.75rem',
+                                        color: '#ef4444',
+                                        marginTop: '-0.5rem',
+                                        marginBottom: '0.5rem',
+                                        lineHeight: 1.4,
+                                    }}
+                                >
+                                    {promoError}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Discount — only rendered when the server returned one */}
+                        {discountAmount > 0 && (
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    fontSize: '0.9rem',
+                                    color: '#6b7280',
+                                    marginBottom: '0.6rem',
+                                }}
+                            >
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    Discount
+                                    <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontWeight: 600, letterSpacing: '0.04em' }}>
+                                        ({appliedPromo.code})
+                                    </span>
+                                </span>
+                                <span style={{ color: '#059669', fontWeight: 600 }}>
+                                    −{formatPrice(discountAmount)}
+                                </span>
+                            </div>
+                        )}
 
                         {/* Shipping */}
                         <div

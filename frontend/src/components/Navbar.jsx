@@ -8,34 +8,28 @@ import { useWishlist } from '../context/WishlistContext';
 import { useUI } from '../context/UIContext';
 import useBodyScrollLock from '../utils/useBodyScrollLock';
 import SearchOverlay from './SearchOverlay';
+import { GENDERS, CATEGORIES_BY_GENDER } from '../utils/productCategories.js';
 
 /* ─── Category hierarchy ───
  *
- * Each `items[]` is rendered in the dropdown. `path` controls where
- * the link goes — categories under Men/Women are leaf categories
- * (e.g. /products/Anarkalis), while items under Kids are subcategories
- * of the parent "Kids" category (e.g. /products/Kids/Boys).
+ * Derived from the shared taxonomy rather than hand-maintained. The gender
+ * grouping this nav has always shown was previously the ONLY place gender
+ * existed in the app — it was a hardcoded array, not data — which is why the
+ * catalog could not answer "show me all Women's items". It is now a real field,
+ * and this list reads from the same source of truth the admin form and the
+ * backend validator use.
+ *
+ * Paths are gender-then-category, which is what existing Kids links already
+ * were: /products/Kids/Boys used to mean category=Kids + subCategory=Boys and
+ * now means gender=Kids + category=Boys — same URL, same result.
  */
-const NAV_GROUPS = [
-    {
-        label: 'Women',
-        items: [
-            'Anarkalis', 'Coord Sets', 'Lehangas', 'Indo Western',
-            'Suits & Kurtis', 'Sarees', 'Blouses', 'Dupattas', 'Pashminas',
-        ].map((c) => ({ label: c, path: `/products/${encodeURIComponent(c)}` })),
-    },
-    {
-        label: 'Men',
-        items: [{ label: "Men's Kurta", path: `/products/${encodeURIComponent("Men's Kurta")}` }],
-    },
-    {
-        label: 'Kids',
-        items: [
-            { label: 'Boys', path: '/products/Kids/Boys' },
-            { label: 'Girls', path: '/products/Kids/Girls' },
-        ],
-    },
-];
+const NAV_GROUPS = GENDERS.map((gender) => ({
+    label: gender,
+    items: CATEGORIES_BY_GENDER[gender].map((category) => ({
+        label: category,
+        path: `/products/${encodeURIComponent(gender)}/${encodeURIComponent(category)}`,
+    })),
+}));
 
 const Navbar = () => {
     const navigate = useNavigate();

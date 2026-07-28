@@ -62,14 +62,20 @@ export const sizeCharts = {
 };
 
 /**
- * Category → chart key. Categories absent from this map (e.g. Dupattas,
- * Pashminas) have no chart and the UI skips the button entirely.
+ * Category → chart key. Categories absent from this map (Dupattas, and the
+ * unstitched Navratri Chaniya Choli) have no chart and the UI skips the button
+ * entirely — that omission is deliberate, not an oversight.
+ *
+ * Keys are gender-scoped category values from utils/productCategories.js. The
+ * legacy "Kidswear" alias that used to live here is gone: the taxonomy
+ * migration resolved those records, so nothing needs normalising before lookup
+ * any more.
  */
 const CATEGORY_TO_CHART = {
     // Women's apparel
     'Anarkalis':       'women',
     'Coord Sets':      'women',
-    'Lehangas':        'women',
+    'Lehengas':        'women',
     'Indo Western':    'women',
     'Suits & Kurtis':  'women',
     'Sarees':          'women',
@@ -78,15 +84,9 @@ const CATEGORY_TO_CHART = {
     // Men's apparel
     "Men's Kurta":     'menKurta',
 
-    // Kids
-    'Kids':            'kids',
-};
-
-// Aliases for categories that may still exist in legacy product
-// records. Normalized before the table lookup so the data map itself
-// stays free of deprecated names.
-const CATEGORY_ALIASES = {
-    'kidswear': 'Kids',
+    // Kids — Boys/Girls are the categories now, not a subCategory under "Kids"
+    'Boys':            'kids',
+    'Girls':           'kids',
 };
 
 /**
@@ -95,9 +95,8 @@ const CATEGORY_ALIASES = {
  */
 export const getSizeChartKey = (category) => {
     if (!category) return null;
-    const normalized = CATEGORY_ALIASES[category.toLowerCase()] || category;
-    if (CATEGORY_TO_CHART[normalized]) return CATEGORY_TO_CHART[normalized];
-    const lower = normalized.toLowerCase();
+    if (CATEGORY_TO_CHART[category]) return CATEGORY_TO_CHART[category];
+    const lower = category.toLowerCase();
     const match = Object.keys(CATEGORY_TO_CHART).find(
         (k) => k.toLowerCase() === lower
     );
