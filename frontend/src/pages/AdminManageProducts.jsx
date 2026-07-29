@@ -7,7 +7,11 @@ import { useAuth } from '../context/AuthContext';
 import formatPrice from '../utils/formatPrice';
 import VariantMatrix from '../components/VariantMatrix';
 import ColorImagesManager, { finalizeColors } from '../components/ColorImagesManager';
-import { buildVariantMatrix, totalStock as variantTotalStock } from '../utils/variants.js';
+import {
+    pruneVariantsToColors,
+    describeVariantProblems,
+    totalStock as variantTotalStock,
+} from '../utils/variants.js';
 import { GENDERS, ALL_CATEGORIES, SPECIAL_TAGS, categoriesForGender } from '../utils/productCategories.js';
 import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
@@ -67,7 +71,11 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
         }))
     );
 
-    /* ── Variant matrix, hydrated from `product.variants` ── */
+    /* ── Variants, hydrated from `product.variants` ──
+       This list is the source of truth for what the product sells. It is NOT
+       derived from a colors × sizes product, which is what previously made a
+       deleted combination un-deletable: any later edit regenerated the full
+       grid and silently brought the deleted row back as a blank one. */
     const [variants, setVariants] = useState(() =>
         (product.variants || []).map((v) => ({
             color: v.color,
@@ -76,14 +84,6 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
             stock: v.stock,
         }))
     );
-    const [sizes, setSizes] = useState(() => {
-        const seen = new Set();
-        const out = [];
-        for (const v of product.variants || []) {
-            if (!seen.has(v.size)) { seen.add(v.size); out.push(v.size); }
-        }
-        return out;
-    });
 
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -120,16 +120,15 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
         });
     };
 
-    /* ── Sync the variant matrix when the color list changes ── */
+    /* ── Keep variants consistent when the color list changes ──
+       Removing a color must drop its variants, or the API rejects them as
+       having no matching color images. This only ever *removes* rows, so an
+       image or color edit can never resurrect a deleted combination. Adding a
+       color adds no variants: the admin picks the sizes for it explicitly. */
     const handleColorsChange = (nextColors) => {
         setColors(nextColors);
         const colorNames = nextColors.map((c) => c.colorName);
-        setVariants((current) => buildVariantMatrix(colorNames, sizes, current));
-    };
-
-    const handleMatrixChange = (nextSizes, nextVariants) => {
-        setSizes(nextSizes);
-        setVariants(nextVariants);
+        setVariants((current) => pruneVariantsToColors(current, colorNames));
     };
 
     /* ── Cloudinary upload helper ── */
@@ -160,15 +159,12 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
             if (variants.length === 0) {
                 setError('Add at least one variant.'); setIsLoading(false); return;
             }
-            for (const v of variants) {
-                const price = Number(v.price);
-                const stock = Number(v.stock);
-                if (!Number.isFinite(price) || price <= 0) {
-                    setError(`Set a valid price for ${v.color} / ${v.size}.`); setIsLoading(false); return;
-                }
-                if (!Number.isFinite(stock) || stock < 0) {
-                    setError(`Set a valid stock for ${v.color} / ${v.size}.`); setIsLoading(false); return;
-                }
+            /* Name every offending row rather than stopping at the first one,
+               so the admin can see exactly which combination is incomplete
+               instead of guessing why Save is refusing. */
+            const variantProblems = describeVariantProblems(variants);
+            if (variantProblems) {
+                setError(variantProblems); setIsLoading(false); return;
             }
 
             const finalColors = await finalizeColors(colors, uploadFiles);
@@ -352,9 +348,8 @@ const ProductEditModal = ({ product, onClose, onSaved, onDeleted }) => {
 
                             <VariantMatrix
                                 colors={colors.map((c) => c.colorName)}
-                                sizes={sizes}
                                 variants={variants}
-                                onChange={handleMatrixChange}
+                                onChange={setVariants}
                             />
                         </div>
                     </div>

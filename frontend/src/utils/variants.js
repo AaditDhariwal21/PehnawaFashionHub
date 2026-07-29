@@ -111,26 +111,129 @@ export const defaultColor = (product) => {
     );
 };
 
-/* ── Admin matrix helpers ────────────────────────────────────── */
+/* ── Admin editor helpers ────────────────────────────────────── */
 
 /**
- * Build/refresh a variant matrix from chosen color + size axes,
- * preserving any values already entered on existing rows.
+ * The variants array is the single source of truth in the admin editor.
  *
- * @param {string[]} colors  active colors
- * @param {string[]} sizes   active sizes
- * @param {Array}    existing  variants already in state
- * @returns {Array} rebuilt variants, one row per (color × size)
+ * It used to be *derived*, by regenerating the full colors × sizes cartesian
+ * product on every edit. That one decision caused two separate bugs:
+ *
+ *   - adding a size fanned it out to every color, because a size existed on
+ *     the product rather than on a color; and
+ *   - deleting a combination could not survive, because a deletion was only
+ *     an absence from a set that the next edit rebuilt from scratch.
+ *
+ * So there is deliberately no "rebuild the matrix" helper here. Every helper
+ * below is an explicit, scoped edit to the variant list the admin can see.
  */
-export const buildVariantMatrix = (colors, sizes, existing = []) => {
-    const lookup = new Map(existing.map((v) => [`${v.color}__${v.size}`, v]));
-    const out = [];
-    for (const color of colors) {
-        for (const size of sizes) {
-            const key = `${color}__${size}`;
-            const prev = lookup.get(key);
-            out.push(prev || { color, size, price: '', stock: '' });
+
+export const variantKey = (color, size) => `${color}__${size}`;
+
+export const hasVariant = (variants, color, size) =>
+    (variants || []).some((v) => v.color === color && v.size === size);
+
+/** Sizes present for one color, in the order the admin added them. */
+export const sizesForColor = (variants, color) =>
+    (variants || []).filter((v) => v.color === color).map((v) => v.size);
+
+/**
+ * Add `size` to each of `targetColors`, skipping any (color, size) that
+ * already exists. New rows start blank so the admin must enter price/stock
+ * deliberately — a blank row is never invented for a color that was not
+ * named in `targetColors`.
+ *
+ * @returns {{ variants: Array, added: string[], skipped: string[] }}
+ */
+export const addSizeToColors = (variants, targetColors, size) => {
+    const trimmed = String(size || '').trim();
+    if (!trimmed) return { variants, added: [], skipped: [] };
+
+    const next = [...(variants || [])];
+    const added = [];
+    const skipped = [];
+
+    for (const color of targetColors) {
+        if (hasVariant(next, color, trimmed)) {
+            skipped.push(`${color} / ${trimmed}`);
+            continue;
         }
+        next.push({ color, size: trimmed, price: '', stock: '' });
+        added.push(`${color} / ${trimmed}`);
     }
-    return out;
+    return { variants: next, added, skipped };
+};
+
+/** Remove `size` from the given colors only. */
+export const removeSizeFromColors = (variants, targetColors, size) => {
+    const scope = new Set(targetColors);
+    return (variants || []).filter(
+        (v) => !(scope.has(v.color) && v.size === size)
+    );
+};
+
+/** Remove one (color, size) combination. This is the authoritative delete. */
+export const removeVariant = (variants, color, size) =>
+    (variants || []).filter((v) => !(v.color === color && v.size === size));
+
+/**
+ * Drop variants whose color is no longer on the product. Called when the
+ * color list changes — the only implicit variant edit that remains, and it
+ * only ever removes, so it can't resurrect a deleted combination.
+ */
+export const pruneVariantsToColors = (variants, colorNames) => {
+    const known = new Set(colorNames);
+    return (variants || []).filter((v) => known.has(v.color));
+};
+
+/* ── Admin validation ────────────────────────────────────────── */
+
+const blank = (x) => x === null || x === undefined || String(x).trim() === '';
+
+/**
+ * Which of a variant's required fields are missing vs present-but-invalid.
+ * Kept separate so the save error can say "is missing stock and price"
+ * rather than a generic "fill in all fields".
+ */
+export const variantFieldIssues = (v) => {
+    const missing = [];
+    const invalid = [];
+
+    if (blank(v?.price)) missing.push('price');
+    else if (!Number.isFinite(Number(v.price)) || Number(v.price) <= 0) invalid.push('price');
+
+    if (blank(v?.stock)) missing.push('stock');
+    else if (!Number.isFinite(Number(v.stock)) || Number(v.stock) < 0) invalid.push('stock');
+
+    return { missing, invalid };
+};
+
+export const isVariantComplete = (v) => {
+    const { missing, invalid } = variantFieldIssues(v);
+    return missing.length === 0 && invalid.length === 0;
+};
+
+const joinFields = (fields) =>
+    fields.length === 2 ? `${fields[0]} and ${fields[1]}` : fields[0];
+
+/**
+ * A specific, admin-actionable save error naming every offending row, e.g.
+ *   "Red / XL is missing stock and price."
+ * Returns '' when every variant is complete.
+ */
+export const describeVariantProblems = (variants, maxListed = 4) => {
+    const parts = [];
+
+    for (const v of variants || []) {
+        const { missing, invalid } = variantFieldIssues(v);
+        const label = `${v.color} / ${v.size}`;
+        if (missing.length) parts.push(`${label} is missing ${joinFields(missing)}`);
+        if (invalid.length) parts.push(`${label} has an invalid ${joinFields(invalid)}`);
+    }
+
+    if (parts.length === 0) return '';
+
+    const listed = parts.slice(0, maxListed);
+    const rest = parts.length - listed.length;
+    return `${listed.join('; ')}${rest > 0 ? `; and ${rest} more` : ''}.`;
 };

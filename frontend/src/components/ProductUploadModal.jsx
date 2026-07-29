@@ -4,7 +4,7 @@ import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import VariantMatrix from './VariantMatrix';
 import ColorImagesManager, { finalizeColors } from './ColorImagesManager';
-import { buildVariantMatrix } from '../utils/variants.js';
+import { pruneVariantsToColors, describeVariantProblems } from '../utils/variants.js';
 import { GENDERS, CATEGORIES_BY_GENDER, SPECIAL_TAGS, categoriesForGender } from '../utils/productCategories.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -33,8 +33,8 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
     // [{ colorName, images: [{kind:'new', file, preview}] }]
     const [colors, setColors] = useState([]);
 
-    // Variant matrix
-    const [sizes, setSizes] = useState([]);
+    // Authoritative variant list — a size belongs to a color, so this is not
+    // derived from a colors × sizes product. See VariantMatrix.
     const [variants, setVariants] = useState([]);
 
     const [isLoading, setIsLoading] = useState(false);
@@ -52,16 +52,14 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
         });
     };
 
-    /* ── Sync variant matrix when colors change ── */
+    /* ── Keep variants consistent when colors change ──
+       Only ever removes: a dropped color's variants would be rejected by the
+       API for having no matching color images. Adding a color adds no
+       variants — the admin picks its sizes explicitly. */
     const handleColorsChange = (nextColors) => {
         setColors(nextColors);
         const colorNames = nextColors.map((c) => c.colorName);
-        setVariants(buildVariantMatrix(colorNames, sizes, variants));
-    };
-
-    const handleMatrixChange = (nextSizes, nextVariants) => {
-        setSizes(nextSizes);
-        setVariants(nextVariants);
+        setVariants((current) => pruneVariantsToColors(current, colorNames));
     };
 
     /* ── Upload helper ── */
@@ -106,15 +104,10 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
             if (variants.length === 0) {
                 setError('Please add at least one size to generate variants.'); setIsLoading(false); return;
             }
-            for (const v of variants) {
-                const price = Number(v.price);
-                const stock = Number(v.stock);
-                if (!Number.isFinite(price) || price <= 0) {
-                    setError(`Set a valid price for ${v.color} / ${v.size}.`); setIsLoading(false); return;
-                }
-                if (!Number.isFinite(stock) || stock < 0) {
-                    setError(`Set a valid stock for ${v.color} / ${v.size}.`); setIsLoading(false); return;
-                }
+            /* Names every incomplete row instead of stopping at the first. */
+            const variantProblems = describeVariantProblems(variants);
+            if (variantProblems) {
+                setError(variantProblems); setIsLoading(false); return;
             }
 
             // Upload all `kind: 'new'` files in place, producing the API payload.
@@ -154,7 +147,7 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
             // Reset form
             setFormData({ name: '', shortDescription: '', description: '', price: '', gender: '', category: '', specialTags: [], weight: '', isCategoryCover: false });
             setColors([]);
-            setSizes([]); setVariants([]);
+            setVariants([]);
 
             if (onSuccess) onSuccess(data.product);
             onClose();
@@ -308,9 +301,8 @@ const ProductUploadModal = ({ isOpen, onClose, onSuccess }) => {
 
                                 <VariantMatrix
                                     colors={colors.map((c) => c.colorName)}
-                                    sizes={sizes}
                                     variants={variants}
-                                    onChange={handleMatrixChange}
+                                    onChange={setVariants}
                                 />
                             </div>
                         </div>
