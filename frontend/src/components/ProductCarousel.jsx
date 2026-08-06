@@ -7,6 +7,7 @@ import formatPrice from '../utils/formatPrice';
 import { startingPrice } from '../utils/variants.js';
 import { productUrl } from '../utils/productUrl.js';
 import CloudinaryImage from './CloudinaryImage.jsx';
+import OutOfStockBadge from './OutOfStockBadge.jsx';
 
 /*
  * ProductCarousel — the shared home-page product rail used by both the
@@ -257,6 +258,8 @@ const ProductCarousel = ({ products = [], loading = false, eager = false }) => {
                         style={{ color: isInCompare(product._id) ? '#EFBF04' : '#6b7280' }}
                     />
                 </button>
+
+                <OutOfStockBadge product={product} compact position={{ bottom: '0.5rem', right: '0.5rem' }} />
             </div>
 
             {/* Product Info */}

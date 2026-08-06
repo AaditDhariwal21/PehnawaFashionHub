@@ -9,6 +9,7 @@ import { startingPrice } from '../utils/variants.js';
 import { productUrl } from '../utils/productUrl.js';
 import './SearchResultsPage.css';
 import CloudinaryImage from '../components/CloudinaryImage.jsx';
+import OutOfStockBadge from '../components/OutOfStockBadge.jsx';
 
 const SearchResultsPage = () => {
     const [searchParams] = useSearchParams();
@@ -194,6 +195,8 @@ const SearchResultsPage = () => {
                                                 }}
                                             />
                                         </button>
+
+                                        <OutOfStockBadge product={product} />
                                     </div>
 
                                     {/* Info */}

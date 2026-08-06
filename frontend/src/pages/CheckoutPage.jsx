@@ -43,6 +43,17 @@ const CheckoutPage = () => {
     const isBuyNow = !!buyNowItem;
     const checkoutItems = isBuyNow ? [buyNowItem] : cartItems;
 
+    /* Admin accounts cannot place orders. This disables the button and explains
+       why — nothing more. The enforcement is blockAdminOrders on the
+       create-checkout and confirm routes server-side; this check exists so an
+       admin is told before clicking rather than by a 403 afterwards. Everything
+       else on the page stays interactive so checkout remains inspectable.
+
+       Keyed off the role, not the admin/customer view toggle: previewing the
+       site as a customer does not stop the account from being an admin, and the
+       server will refuse it either way. */
+    const isAdminAccount = user?.role === 'admin';
+
     const subtotal = isBuyNow
         ? buyNowItem.price * buyNowItem.quantity
         : getSubtotal();
@@ -182,6 +193,7 @@ const CheckoutPage = () => {
         e.preventDefault();
 
         if (!user) { navigate('/signin'); return; }
+        if (isAdminAccount) return;
         if (!validate()) return;
 
         /* If shipping hasn't been calculated yet, fetch it first */
@@ -240,6 +252,11 @@ const CheckoutPage = () => {
                     sessionStorage.setItem('pehnawa_squareOrderId', data.squareOrderId);
                 }
                 window.location.href = data.checkoutUrl;
+            } else if (data.code === 'ADMIN_CANNOT_ORDER') {
+                /* Only reachable if the disabled button was bypassed, or if the
+                   account was promoted to admin after this page loaded. The
+                   server's message is the authoritative one. */
+                alert(data.message);
             } else if (data.code?.startsWith('PROMO_')) {
                 /* The code stopped being valid between Apply and Pay. Show the
                    specific reason inline instead of an opaque alert, and leave
@@ -801,46 +818,69 @@ const CheckoutPage = () => {
                         </div>
 
                         {/* Pay Now Button */}
-                        <button
-                            type="submit"
-                            disabled={placing || shippingLoading || !shippingKnown}
-                            style={{
-                                width: '100%',
-                                padding: '0.9rem',
-                                fontSize: '0.95rem',
-                                fontWeight: 700,
-                                color: '#fff',
-                                background: (placing || shippingLoading || !shippingKnown) ? '#d1d5db' : 'linear-gradient(135deg, #EFBF04, #d4a904)',
-                                border: 'none',
-                                borderRadius: '0.6rem',
-                                cursor: (placing || shippingLoading || !shippingKnown) ? 'not-allowed' : 'pointer',
-                                letterSpacing: '0.06em',
-                                textTransform: 'uppercase',
-                                fontFamily: 'inherit',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '0.5rem',
-                                transition: 'all 0.2s',
-                            }}
-                            onMouseEnter={(e) => { if (!placing && !shippingLoading && shippingKnown) { e.currentTarget.style.opacity = '0.9'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(239, 191, 4, 0.4)'; } }}
-                            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.boxShadow = 'none'; }}
-                        >
-                            <Lock size={16} strokeWidth={2.5} />
-                            {placing ? 'Placing Order…' : 'Pay Now'}
-                        </button>
+                        {(() => {
+                            const payDisabled = placing || shippingLoading || !shippingKnown || isAdminAccount;
+                            return (
+                                <button
+                                    type="submit"
+                                    disabled={payDisabled}
+                                    aria-describedby={isAdminAccount ? 'admin-order-block' : undefined}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.9rem',
+                                        fontSize: '0.95rem',
+                                        fontWeight: 700,
+                                        color: '#fff',
+                                        background: payDisabled ? '#d1d5db' : 'linear-gradient(135deg, #EFBF04, #d4a904)',
+                                        border: 'none',
+                                        borderRadius: '0.6rem',
+                                        cursor: payDisabled ? 'not-allowed' : 'pointer',
+                                        letterSpacing: '0.06em',
+                                        textTransform: 'uppercase',
+                                        fontFamily: 'inherit',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '0.5rem',
+                                        transition: 'all 0.2s',
+                                    }}
+                                    onMouseEnter={(e) => { if (!payDisabled) { e.currentTarget.style.opacity = '0.9'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(239, 191, 4, 0.4)'; } }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.boxShadow = 'none'; }}
+                                >
+                                    <Lock size={16} strokeWidth={2.5} />
+                                    {placing ? 'Placing Order…' : 'Pay Now'}
+                                </button>
+                            );
+                        })()}
 
-                        <p
-                            style={{
-                                fontSize: '0.73rem',
-                                color: '#9ca3af',
-                                textAlign: 'center',
-                                marginTop: '0.75rem',
-                                lineHeight: 1.5,
-                            }}
-                        >
-                            Your payment information is secure
-                        </p>
+                        {isAdminAccount ? (
+                            <p
+                                id="admin-order-block"
+                                role="alert"
+                                style={{
+                                    fontSize: '0.78rem',
+                                    color: '#b45309',
+                                    textAlign: 'center',
+                                    marginTop: '0.75rem',
+                                    lineHeight: 1.5,
+                                    fontWeight: 600,
+                                }}
+                            >
+                                Admin accounts cannot place orders.
+                            </p>
+                        ) : (
+                            <p
+                                style={{
+                                    fontSize: '0.73rem',
+                                    color: '#9ca3af',
+                                    textAlign: 'center',
+                                    marginTop: '0.75rem',
+                                    lineHeight: 1.5,
+                                }}
+                            >
+                                Your payment information is secure
+                            </p>
+                        )}
                     </div>
                 </div>
             </form>

@@ -1,5 +1,4 @@
 import PendingOrder from "../models/PendingOrder.js";
-import Product from "../models/Products.js";
 import Order from "../models/Order.js";
 
 /**
@@ -32,10 +31,18 @@ import Order from "../models/Order.js";
  *      models/Order.js). This enforces "one order per Square order" in the
  *      database itself, covering anything the lease can't: a stale lease being
  *      re-taken while the original worker is still alive, direct database
- *      writes, and future code paths. When it fires, the caller restores the
- *      stock it had already deducted (restoreStock).
+ *      writes, and future code paths.
  *
- * Note both layers are single atomic database operations, not check-then-act.
+ *   3. The inventory ledger on the order document itself — `stockApplied`,
+ *      claimed atomically by applyOrderStock() in services/inventory.js. Stock
+ *      is written only AFTER the order insert has picked a winner, and only by
+ *      whoever wins that claim, so a loser has deducted nothing and there is no
+ *      compensating restore to get wrong. This module used to export a
+ *      restoreStock() for exactly that undo; it is gone, along with the window
+ *      where a crash between deducting and inserting stranded inventory.
+ *
+ * Note all three layers are single atomic database operations, not
+ * check-then-act.
  */
 
 /**
@@ -121,24 +128,6 @@ export const isDuplicateSquareOrderError = (error) => {
 
 /** True for any duplicate-key rejection, whichever index it came from. */
 export const isDuplicateKeyError = (error) => error?.code === 11000;
-
-/**
- * Give back stock deducted by an attempt that then failed to create its order.
- * Mirrors the deduction exactly, so the net effect is zero.
- *
- * @param {Array<{product: object, color: string, size: string, qty: number}>} resolved
- */
-export const restoreStock = async (resolved) => {
-    for (const r of resolved) {
-        await Product.updateOne(
-            {
-                _id: r.product._id,
-                variants: { $elemMatch: { color: r.color, size: r.size } },
-            },
-            { $inc: { "variants.$.stock": r.qty } }
-        );
-    }
-};
 
 /**
  * Wait briefly for the trigger that holds the lease to finish, so a customer

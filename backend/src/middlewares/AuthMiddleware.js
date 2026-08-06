@@ -57,6 +57,30 @@ export const isAdmin = async (req, res, next) => {
     }
 };
 
+/**
+ * Refuse order placement by admin accounts.
+ *
+ * The checkout page disables its Pay Now button for admins, but that is a
+ * courtesy to the person clicking, not a control: a disabled button is a DOM
+ * attribute, and the endpoints behind it are reachable with a token and curl.
+ * This is the actual enforcement, and it deliberately does not consult anything
+ * the client sent — only the role inside the signed JWT.
+ *
+ * Applied to the checkout-creation and payment-confirmation routes rather than
+ * to browsing or cart routes: admins are meant to be able to shop the site and
+ * reach checkout to inspect it, and are stopped only at the point of ordering.
+ */
+export const blockAdminOrders = (req, res, next) => {
+    if (req.user?.role === "admin") {
+        return res.status(403).json({
+            success: false,
+            code: "ADMIN_CANNOT_ORDER",
+            message: "Admin accounts cannot place orders. Please use a customer account to check out.",
+        });
+    }
+    next();
+};
+
 // Middleware to get full user data from database (optional, use when needed)
 export const getFullUser = async (req, res, next) => {
     try {

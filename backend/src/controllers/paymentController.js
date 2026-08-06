@@ -17,9 +17,9 @@ import {
     findOrderBySquareOrderId,
     isDuplicateSquareOrderError,
     releasePendingOrderClaim,
-    restoreStock,
     waitForOrderBySquareOrderId,
 } from "../services/orderCreation.js";
+import { applyOrderStock } from "../services/inventory.js";
 import crypto from "crypto";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
@@ -305,53 +305,6 @@ export const createCheckoutSession = async (req, res) => {
 };
 
 /* ══════════════════════════════════════════════════════════════
-   Helper: Atomic stock deduction with race-condition protection.
-   Returns true if ALL items were successfully deducted.
-   On failure, rolls back any items already deducted.
-   ══════════════════════════════════════════════════════════════ */
-const deductStockAtomically = async (resolved) => {
-    const deducted = []; // track successful deductions for rollback
-
-    for (const r of resolved) {
-        const result = await Product.updateOne(
-            {
-                _id: r.product._id,
-                variants: {
-                    $elemMatch: {
-                        color: r.color,
-                        size: r.size,
-                        stock: { $gte: r.qty },
-                    },
-                },
-            },
-            { $inc: { "variants.$.stock": -r.qty } }
-        );
-
-        if (result.modifiedCount === 0) {
-            for (const d of deducted) {
-                await Product.updateOne(
-                    {
-                        _id: d.productId,
-                        variants: { $elemMatch: { color: d.color, size: d.size } },
-                    },
-                    { $inc: { "variants.$.stock": d.qty } }
-                );
-            }
-            return {
-                success: false,
-                failedProduct: r.product.name,
-                failedColor: r.color,
-                failedSize: r.size,
-            };
-        }
-
-        deducted.push({ productId: r.product._id, color: r.color, size: r.size, qty: r.qty });
-    }
-
-    return { success: true };
-};
-
-/* ══════════════════════════════════════════════════════════════
    POST /api/orders/verify-square-payment
    POST /api/orders/confirm-square-payment
    POST /api/payments/confirm
@@ -389,6 +342,10 @@ export const confirmPayment = async (req, res) => {
         /* ── 2. Idempotency: check if order already created for this Square order ── */
         const existingOrder = await findOrderBySquareOrderId(pending.squareOrderId);
         if (existingOrder) {
+            /* Also finish the job if whoever created it died before applying
+               stock. applyOrderStock is a no-op when the order's ledger is
+               already claimed, so this is a repair, not a second deduction. */
+            await applyOrderStock(existingOrder);
             await PendingOrder.deleteOne({ _id: pending._id });
             return res.json({ success: true, order: existingOrder });
         }
@@ -453,6 +410,11 @@ export const confirmPayment = async (req, res) => {
             console.error(
                 `[confirmPayment] Amount mismatch: Square charged ${paidAmountCents}¢, expected ${expectedCents}¢ (order ${pending.squareOrderId})`
             );
+            /* Every bail-out from here on releases the lease. Returning while
+               still holding it left the checkout locked for the full lease
+               window, which blocked the retry these responses invite and made
+               Square's redelivery arrive to a "already being processed" no-op. */
+            await releasePendingOrderClaim(pending._id);
             return res.status(400).json({
                 success: false,
                 message: "Payment amount does not match order total. Please contact support.",
@@ -465,6 +427,7 @@ export const confirmPayment = async (req, res) => {
         for (const ci of pending.cartItems) {
             const product = await Product.findById(ci.productId);
             if (!product) {
+                await releasePendingOrderClaim(pending._id);
                 return res.status(404).json({
                     success: false,
                     message: `Product not found: ${ci.productId}`,
@@ -473,6 +436,7 @@ export const confirmPayment = async (req, res) => {
 
             const variant = findVariant(product, ci.color, ci.size);
             if (!variant) {
+                await releasePendingOrderClaim(pending._id);
                 return res.status(400).json({
                     success: false,
                     message: `Variant ${ci.color} / ${ci.size} no longer exists for "${product.name}".`,
@@ -489,16 +453,11 @@ export const confirmPayment = async (req, res) => {
             });
         }
 
-        /* ── 6. Deduct stock atomically (race-condition safe) ── */
-        const stockResult = await deductStockAtomically(resolved);
-        if (!stockResult.success) {
-            return res.status(400).json({
-                success: false,
-                message: `Insufficient stock for "${stockResult.failedProduct}" (${stockResult.failedColor} / ${stockResult.failedSize}). It may have just sold out.`,
-            });
-        }
-
-        /* ── 7. Create the order ── */
+        /* ── 6. Create the order ──
+           Before the stock is touched, not after. The unique index on
+           paymentResult.squareOrderId makes this insert the single point at
+           which one trigger is chosen for this payment; the loser deducts
+           nothing and so has nothing to compensate. */
         const orderItems = resolved.map((r) => ({
             productId: r.product._id,
             name: r.product.name,
@@ -533,11 +492,11 @@ export const confirmPayment = async (req, res) => {
                 paidAt: new Date(),
             });
         } catch (createErr) {
-            /* Whatever went wrong, stock has been deducted for an order that
-               does not exist. Give it back first. */
-            await restoreStock(resolved);
+            /* No stock has been touched at this point — that is the whole
+               reason the insert moved ahead of the decrement — so there is
+               nothing to give back.
 
-            /* Backstop fired: the unique index on paymentResult.squareOrderId
+               Backstop fired: the unique index on paymentResult.squareOrderId
                rejected this insert because another trigger got there first,
                despite the lease. Return the order that did win.
 
@@ -550,6 +509,10 @@ export const confirmPayment = async (req, res) => {
                 const winner = await findOrderBySquareOrderId(pending.squareOrderId);
                 await PendingOrder.deleteOne({ _id: pending._id });
                 if (winner) {
+                    /* The winner may still be mid-flight between its own insert
+                       and its stock application. Harmless to attempt: the ledger
+                       claim means only one of us can possibly succeed. */
+                    await applyOrderStock(winner);
                     return res.json({ success: true, order: winner });
                 }
                 return res.status(409).json({
@@ -564,6 +527,13 @@ export const confirmPayment = async (req, res) => {
             throw createErr;
         }
 
+        /* ── 7. Apply the stock decrements ──
+           The single centralized, atomic, idempotent inventory write for this
+           order. A shortfall does not fail the request: the payment is already
+           captured, so the order stands and is flagged for admin review rather
+           than the customer being told their paid order does not exist. */
+        const stockResult = await applyOrderStock(order);
+
         /* ── 8. Promote the promo reservation to a confirmed redemption.
            Idempotent, because the Square webhook races this handler for the
            same order — whichever arrives second is a no-op. */
@@ -575,7 +545,13 @@ export const confirmPayment = async (req, res) => {
         /* ── 9. Clean up pending order ── */
         await PendingOrder.deleteOne({ _id: pending._id });
 
-        return res.status(201).json({ success: true, order });
+        return res.status(201).json({
+            success: true,
+            order,
+            /* Surfaced so the confirmation page could mention a delay if it ever
+               needs to; the order itself carries the detail for the admin. */
+            fulfillmentHold: stockResult.shortfalls.length > 0,
+        });
     } catch (error) {
         console.error("confirmPayment error:", error);
         return res.status(500).json({

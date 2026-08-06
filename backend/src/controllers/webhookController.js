@@ -10,8 +10,8 @@ import {
     findOrderBySquareOrderId,
     isDuplicateSquareOrderError,
     releasePendingOrderClaim,
-    restoreStock,
 } from "../services/orderCreation.js";
+import { applyOrderStock } from "../services/inventory.js";
 
 const SIGNATURE_KEY = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY || "";
 const WEBHOOK_URL = process.env.SQUARE_WEBHOOK_URL || "";
@@ -90,6 +90,12 @@ export const handleSquareWebhook = async (req, res) => {
         const existingOrder = await findOrderBySquareOrderId(squareOrderId);
         if (existingOrder) {
             console.log(`[Webhook] Order already exists for Square order ${squareOrderId} — skipping.`);
+            /* Except for one thing: finish applying stock if whoever created the
+               order died before doing so. Idempotent — a no-op when the order's
+               inventory ledger has already been claimed, which is the norm. This
+               is what makes Square's redelivery a self-healing retry rather than
+               a wasted call. */
+            await applyOrderStock(existingOrder);
             return res.status(200).send("OK");
         }
 
@@ -132,6 +138,10 @@ export const handleSquareWebhook = async (req, res) => {
             console.error(
                 `[Webhook] Amount mismatch for ${squareOrderId}: Square=${paidAmountCents}¢, expected=${expectedCents}¢ — skipping order creation.`
             );
+            /* Every bail-out from here on hands the lease back. Holding it while
+               returning made Square's redelivery — the retry that might well
+               succeed — land on a "already being processed" skip instead. */
+            await releasePendingOrderClaim(pending._id);
             return res.status(200).send("OK");
         }
 
@@ -141,12 +151,14 @@ export const handleSquareWebhook = async (req, res) => {
             const product = await Product.findById(ci.productId);
             if (!product) {
                 console.error(`[Webhook] Product not found: ${ci.productId}`);
+                await releasePendingOrderClaim(pending._id);
                 return res.status(200).send("OK");
             }
 
             const variant = findVariant(product, ci.color, ci.size);
             if (!variant) {
                 console.error(`[Webhook] Variant ${ci.color}/${ci.size} not found for ${product.name}`);
+                await releasePendingOrderClaim(pending._id);
                 return res.status(200).send("OK");
             }
 
@@ -160,49 +172,13 @@ export const handleSquareWebhook = async (req, res) => {
             });
         }
 
-        /* ── 10. Deduct stock atomically (race-condition safe) ── */
-        const deducted = [];
-        let stockFailed = false;
-
-        for (const r of resolved) {
-            const result = await Product.updateOne(
-                {
-                    _id: r.product._id,
-                    variants: {
-                        $elemMatch: {
-                            color: r.color,
-                            size: r.size,
-                            stock: { $gte: r.qty },
-                        },
-                    },
-                },
-                { $inc: { "variants.$.stock": -r.qty } }
-            );
-
-            if (result.modifiedCount === 0) {
-                console.error(`[Webhook] Stock race condition for "${r.product.name}" (${r.color} / ${r.size}).`);
-                for (const d of deducted) {
-                    await Product.updateOne(
-                        {
-                            _id: d.productId,
-                            variants: { $elemMatch: { color: d.color, size: d.size } },
-                        },
-                        { $inc: { "variants.$.stock": d.qty } }
-                    );
-                }
-                stockFailed = true;
-                break;
-            }
-
-            deducted.push({ productId: r.product._id, color: r.color, size: r.size, qty: r.qty });
-        }
-
-        if (stockFailed) {
-            console.error(`[Webhook] Order skipped due to insufficient stock (squareOrderId: ${squareOrderId}).`);
-            return res.status(200).send("OK");
-        }
-
-        /* ── 11. Create the order ── */
+        /* ── 10. Create the order ──
+           Ahead of the stock write, and unconditionally on stock availability.
+           This handler used to deduct first and then, if any line came up short,
+           log and return without creating anything — for a payment Square had
+           already captured. The customer was charged and left with no order at
+           all, in their history or the admin panel. A shortfall is now recorded
+           on the order (see applyOrderStock) instead of erasing it. */
         const orderItems = resolved.map((r) => ({
             productId: r.product._id,
             name: r.product.name,
@@ -235,21 +211,27 @@ export const handleSquareWebhook = async (req, res) => {
                 paidAt: new Date(),
             });
         } catch (createErr) {
-            /* Backstop fired, or the insert failed for some other reason. Either
-               way stock has already been deducted for an order that does not
-               exist, so give it back before bailing out. */
-            await restoreStock(resolved);
-
+            /* No stock was touched before the insert, so a failed insert leaves
+               nothing to compensate — the reason the ordering was inverted. */
             if (isDuplicateSquareOrderError(createErr)) {
-                console.log(`[Webhook] Order for Square order ${squareOrderId} already created by another trigger — stock restored, skipping.`);
+                console.log(`[Webhook] Order for Square order ${squareOrderId} already created by another trigger — skipping.`);
+                /* The winner may not have applied its stock yet; attempting is
+                   free, since only one claim on the ledger can ever succeed. */
+                const winner = await findOrderBySquareOrderId(squareOrderId);
+                if (winner) await applyOrderStock(winner);
             } else {
                 /* Not a duplicate payment — a genuine failure. Release the lease
                    so Square's redelivery can retry rather than waiting it out. */
-                console.error(`[Webhook] Order creation failed for ${squareOrderId} — stock restored:`, createErr);
+                console.error(`[Webhook] Order creation failed for ${squareOrderId}:`, createErr);
                 await releasePendingOrderClaim(pending._id);
             }
             return res.status(200).send("OK");
         }
+
+        /* ── 11. Apply the stock decrements ──
+           The same centralized, atomic, idempotent inventory write the confirm
+           endpoint calls. This handler no longer has a stock loop of its own. */
+        await applyOrderStock(order);
 
         /* ── 12. Promote the promo reservation to a confirmed redemption.
            Idempotent — confirmPayment() races this handler for the same order

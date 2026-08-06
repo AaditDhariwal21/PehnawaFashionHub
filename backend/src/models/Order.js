@@ -30,6 +30,21 @@ const shippingAddressSchema = new mongoose.Schema(
     { _id: false }
 );
 
+/* ── Embedded: unfulfillable line, recorded when stock fell short ── */
+const stockIssueSchema = new mongoose.Schema(
+    {
+        productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+        name: { type: String, default: "" },
+        color: { type: String, default: "" },
+        size: { type: String, default: "" },
+        requested: { type: Number, default: 0 },
+        deducted: { type: Number, default: 0 },
+        shortfall: { type: Number, default: 0 },
+        reason: { type: String, default: "" },
+    },
+    { _id: false }
+);
+
 /* ── Main Order Schema ── */
 const orderSchema = new mongoose.Schema(
     {
@@ -92,6 +107,40 @@ const orderSchema = new mongoose.Schema(
         paidAt: {
             type: Date,
         },
+        /**
+         * Inventory idempotency ledger. Flipping this false -> true is the
+         * atomic claim that lets exactly one caller decrement stock for this
+         * order, however many triggers fire for the payment; see
+         * applyOrderStock() in services/inventory.js.
+         *
+         * The `default: false` matters. Orders predating this field had their
+         * stock deducted by the previous pre-insert flow and carry no such
+         * field, so they match neither false nor true and can never be
+         * claimed — which is precisely what stops a webhook arriving mid-deploy
+         * from deducting an old order's stock a second time, with no backfill
+         * migration required.
+         */
+        stockApplied: {
+            type: Boolean,
+            default: false,
+        },
+        stockAppliedAt: {
+            type: Date,
+        },
+        /**
+         * Set when the order was paid but inventory could not fully cover it.
+         * The payment is already captured at that point, so the order is kept
+         * and flagged rather than refused — refusing would take the customer's
+         * money and leave no record of what they bought. `stockIssues` carries
+         * the per-line arithmetic an admin needs to restock, part-ship or
+         * refund.
+         */
+        fulfillmentHold: {
+            type: Boolean,
+            default: false,
+            index: true,
+        },
+        stockIssues: [stockIssueSchema],
     },
     { timestamps: true }
 );

@@ -7,6 +7,7 @@ import formatPrice from '../utils/formatPrice';
 import { getCardPrice } from '../utils/getEffectivePrice';
 import { productUrl } from '../utils/productUrl.js';
 import CloudinaryImage from './CloudinaryImage.jsx';
+import OutOfStockBadge from './OutOfStockBadge.jsx';
 
 const API = import.meta.env.VITE_API_URL;
 const MAX_RELATED = 6;
@@ -206,6 +207,8 @@ const RelatedProducts = ({ currentProduct }) => {
                                             {product.specialTags[0]}
                                         </span>
                                     )}
+
+                                    <OutOfStockBadge product={product} compact />
                                 </div>
 
                                 {/* Info */}

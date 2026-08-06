@@ -10,6 +10,7 @@ import { findVariant, startingPrice, displayPrice, hasDiscount, defaultColor, to
 import { getDisplayImages } from '../utils/getDisplayImages';
 import { productUrl } from '../utils/productUrl.js';
 import CloudinaryImage from '../components/CloudinaryImage.jsx';
+import OutOfStockBadge from '../components/OutOfStockBadge.jsx';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -273,6 +274,11 @@ const WishlistPage = () => {
                                                     {Math.round((1 - effectivePrice / product.price) * 100)}% OFF
                                                 </span>
                                             )}
+
+                                            {/* The Add to Bag button below already reads "Out of Stock",
+                                                but the badge is what the other grids use, and a wishlist
+                                                of thirty items is scanned by image, not by button text. */}
+                                            <OutOfStockBadge product={product} />
                                         </div>
 
                                         {/* Card body */}

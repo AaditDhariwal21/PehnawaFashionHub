@@ -176,6 +176,29 @@ const AdminOrdersPage = () => {
                                                 }}>
                                                     {order.orderStatus}
                                                 </span>
+                                                {/* Paid, but inventory could not cover it. Needs a human:
+                                                    restock, part-ship or refund. Shown beside the status
+                                                    rather than folded into it, because it is orthogonal —
+                                                    a held order can be at any stage of fulfilment. */}
+                                                {order.fulfillmentHold && (
+                                                    <span
+                                                        title={
+                                                            (order.stockIssues || [])
+                                                                .map((s) => `${s.name} (${s.color}/${s.size}): ordered ${s.requested}, only ${s.deducted} in stock`)
+                                                                .join('\n') || 'Stock could not cover this order.'
+                                                        }
+                                                        style={{
+                                                            display: 'inline-block', marginTop: '0.3rem',
+                                                            padding: '0.2rem 0.55rem', borderRadius: '999px',
+                                                            fontSize: '0.68rem', fontWeight: 700,
+                                                            backgroundColor: '#fef2f2', color: '#b91c1c',
+                                                            border: '1px solid #fecaca', cursor: 'help',
+                                                            whiteSpace: 'nowrap',
+                                                        }}
+                                                    >
+                                                        ⚠ Stock Issue
+                                                    </span>
+                                                )}
                                             </td>
                                             <td style={tdStyle}>
                                                 {new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}

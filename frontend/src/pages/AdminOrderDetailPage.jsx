@@ -153,6 +153,44 @@ const AdminOrderDetailPage = () => {
                     </span>
                 </div>
 
+                {/* ── Fulfilment hold ──
+                    The order was paid but stock could not cover it, so the
+                    decrement was clamped and the difference recorded. Surfaced
+                    at the top of the page, above the items, because it changes
+                    what the admin should do with this order before they do
+                    anything else with it. */}
+                {order.fulfillmentHold && (
+                    <div
+                        role="alert"
+                        style={{
+                            background: '#fef2f2', border: '2px solid #fecaca',
+                            borderRadius: '1rem', padding: '1.25rem 1.5rem',
+                            marginBottom: '1.5rem',
+                        }}
+                    >
+                        <h3 style={{ fontSize: '0.98rem', fontWeight: 700, color: '#b91c1c', marginBottom: '0.5rem' }}>
+                            ⚠ Stock could not cover this order
+                        </h3>
+                        <p style={{ fontSize: '0.83rem', color: '#7f1d1d', marginBottom: '0.75rem', lineHeight: 1.5 }}>
+                            Payment was captured, so the order was kept. Inventory was reduced by
+                            as much as was available and the shortfall is listed below — restock,
+                            part-ship or refund as appropriate.
+                        </p>
+                        <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.83rem', color: '#7f1d1d', lineHeight: 1.7 }}>
+                            {(order.stockIssues || []).map((s, i) => (
+                                <li key={i}>
+                                    <strong>{s.name}</strong>
+                                    {(s.color || s.size) && ` (${[s.color, s.size].filter(Boolean).join(' / ')})`}
+                                    {' — ordered '}{s.requested}
+                                    {', reduced by '}{s.deducted}
+                                    {', short '}<strong>{s.shortfall}</strong>
+                                    {s.reason && ` · ${s.reason}`}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_340px] gap-6">
                     {/* ── Left: Items + Totals ── */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

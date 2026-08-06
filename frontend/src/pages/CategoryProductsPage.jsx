@@ -8,6 +8,7 @@ import formatPrice from '../utils/formatPrice';
 import { startingPrice } from '../utils/variants.js';
 import { productUrl } from '../utils/productUrl.js';
 import CloudinaryImage from '../components/CloudinaryImage.jsx';
+import OutOfStockBadge from '../components/OutOfStockBadge.jsx';
 
 const CategoryProductsPage = () => {
     /* Route params are positional, not semantic: /products/:a/:b is
@@ -232,6 +233,8 @@ const CategoryProductsPage = () => {
                                                 }}
                                             />
                                         </button>
+
+                                        <OutOfStockBadge product={product} />
                                     </div>
 
                                     {/* Info */}

@@ -44,8 +44,8 @@ import {
     findOrderBySquareOrderId,
     isDuplicateKeyError,
     isDuplicateSquareOrderError,
-    restoreStock,
 } from "../services/orderCreation.js";
+import { applyOrderStock } from "../services/inventory.js";
 import { confirmPromoRedemption } from "../services/promoService.js";
 
 const TAG = "__VERIFY_CONCURRENCY__";
@@ -128,14 +128,27 @@ const run = async () => {
 
         /**
          * Faithful stand-in for the body of both real handlers, in the same
-         * order: duplicate check -> [lease] -> Square call -> stock deduction ->
-         * Order.create -> confirm promo -> delete pending.
+         * order: duplicate check -> [lease] -> Square call -> Order.create ->
+         * applyOrderStock -> confirm promo -> delete pending.
+         *
+         * Note the order of the last two: the insert comes BEFORE the stock
+         * write, and the stock write is the real applyOrderStock() from
+         * services/inventory.js rather than a hand-rolled copy of it. That is
+         * the point of this script now — the inventory ledger claim inside that
+         * function is the thing under test, so calling anything else here would
+         * verify a fiction.
          */
         const worker = async ({ pending, label, useLease = true, squareCallMs = 40, counters }) => {
             const squareOrderId = pending.squareOrderId;
 
-            /* Step: pre-existing order check (what both handlers do first). */
-            if (await findOrderBySquareOrderId(squareOrderId)) {
+            /* Step: pre-existing order check (what both handlers do first).
+               Both now also attempt applyOrderStock on the order they find, to
+               finish the job if its creator died before applying stock. It must
+               be a no-op in the normal case, which is exactly what the
+               "decremented exactly once" assertions below are checking. */
+            const already = await findOrderBySquareOrderId(squareOrderId);
+            if (already) {
+                await applyOrderStock(already);
                 counters.shortCircuited.push(label);
                 return { label, outcome: "already-existed" };
             }
@@ -154,21 +167,7 @@ const run = async () => {
             counters.squareCalls.push(label);
             await sleep(squareCallMs);
 
-            /* Step: deduct stock (the real thing, atomically per variant). */
-            const dec = await Product.updateOne(
-                {
-                    _id: product._id,
-                    variants: { $elemMatch: { color: "Blue", size: "M", stock: { $gte: QTY } } },
-                },
-                { $inc: { "variants.$.stock": -QTY } }
-            );
-            if (dec.modifiedCount === 0) {
-                counters.stockFailed.push(label);
-                return { label, outcome: "stock-failed" };
-            }
-            const resolved = [{ product, color: "Blue", size: "M", qty: QTY }];
-
-            /* Step: create the order. */
+            /* Step: create the order — ahead of any stock write. */
             try {
                 const order = await Order.create({
                     /* Explicit distinct orderId so this test isolates the
@@ -198,13 +197,22 @@ const run = async () => {
                 });
 
                 counters.created.push(label);
+
+                /* Step: the centralized inventory write. */
+                const stockResult = await applyOrderStock(order);
+                if (stockResult.applied) counters.stockApplied.push(label);
+                if (stockResult.shortfalls.length) counters.stockShort.push(label);
+
                 await confirmPromoRedemption({ squareOrderId, orderId: order._id });
                 await PendingOrder.deleteOne({ _id: pending._id });
                 return { label, outcome: "created", orderId: order._id };
             } catch (err) {
-                /* Exactly what both handlers now do. */
-                await restoreStock(resolved);
+                /* Exactly what both handlers now do. No stock was touched before
+                   the insert, so a loser has nothing to give back — it only
+                   attempts to finish the winner's stock application. */
                 if (isDuplicateSquareOrderError(err)) {
+                    const winner = await findOrderBySquareOrderId(squareOrderId);
+                    if (winner) await applyOrderStock(winner);
                     counters.rejectedByIndex.push(label);
                     return { label, outcome: "rejected-by-index" };
                 }
@@ -215,6 +223,7 @@ const run = async () => {
         const freshCounters = () => ({
             shortCircuited: [], lostLease: [], pastLease: [], squareCalls: [],
             stockFailed: [], created: [], rejectedByIndex: [],
+            stockApplied: [], stockShort: [],
         });
 
         /* ═══════════════════════════════════════════════════════════
@@ -279,8 +288,10 @@ const run = async () => {
                 orderCount === 1, `got ${orderCount}`);
             check("losers were rejected by the unique index",
                 c.rejectedByIndex.length === 2, `got ${c.rejectedByIndex.length}`);
-            check(`stock still net -1 — losers restored what they deducted`,
+            check(`stock still net -1 — losers never deducted in the first place`,
                 stock === START_STOCK - QTY, `got ${stock} (expected ${START_STOCK - QTY})`);
+            check("exactly one trigger applied stock",
+                c.stockApplied.length === 1, `got ${c.stockApplied.length}: ${c.stockApplied}`);
 
             await PendingOrder.deleteMany({ squareOrderId: sqId });
         }
@@ -360,7 +371,7 @@ const run = async () => {
             check("one created, one rejected by the index, no crash",
                 c.created.length === 1 && c.rejectedByIndex.length === 1,
                 `created=${c.created.length} rejected=${c.rejectedByIndex.length}`);
-            check("stock net -1, not -2 — the loser restored its deduction",
+            check("stock net -1, not -2 — the loser deducted nothing to begin with",
                 stock === START_STOCK - QTY, `got ${stock}`);
             check("neither call threw",
                 results.every((r) => r && r.outcome), JSON.stringify(results.map((r) => r?.outcome)));
@@ -430,6 +441,138 @@ const run = async () => {
                 (await PromoRedemption.countDocuments({ squareOrderId: sqId })) === 1);
 
             await PendingOrder.deleteMany({ squareOrderId: sqId });
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           TEST F — the inventory ledger itself. Everything above tests it
+           through the handlers; this tests it directly, because "stock is
+           decremented exactly once per order" is the guarantee the whole
+           design rests on and it should be provable in isolation.
+           ═══════════════════════════════════════════════════════════ */
+        console.log("\nTEST F  applyOrderStock is idempotent under repetition and concurrency");
+        {
+            await resetStock();
+
+            const makeOrder = (sqId, qty = QTY) => Order.create({
+                orderId: `${TAG}-F-${sqId}`,
+                user: user._id,
+                items: [{
+                    productId: product._id, name: product.name,
+                    color: "Blue", size: "M", price: 100, quantity: qty,
+                }],
+                shippingAddress,
+                paymentResult: { squareOrderId: sqId, squarePaymentId: `${sqId}-p`, status: "COMPLETED" },
+                subtotal: 100, shippingCost: 8, totalAmount: 108,
+                orderStatus: "Paid", isPaid: true, paidAt: new Date(),
+            });
+
+            /* F1 — called ten times in a row for one order. */
+            const o1 = await makeOrder(`${TAG}-sq-F1-${Date.now()}`);
+            const serial = [];
+            for (let i = 0; i < 10; i += 1) serial.push(await applyOrderStock(o1));
+
+            check("ten sequential calls deduct once (10 -> 9)",
+                (await stockOf()) === START_STOCK - QTY, `got ${await stockOf()}`);
+            check("exactly one call reported applied, nine reported already-applied",
+                serial.filter((r) => r.applied).length === 1
+                && serial.filter((r) => r.alreadyApplied).length === 9,
+                `applied=${serial.filter((r) => r.applied).length}`);
+            check("the ledger flag is set on the order",
+                (await Order.findById(o1._id)).stockApplied === true);
+
+            /* F2 — twenty concurrent calls for one order. This is the shape of a
+               webhook storm plus a double-clicked confirmation page. */
+            await resetStock();
+            const o2 = await makeOrder(`${TAG}-sq-F2-${Date.now()}`);
+            const parallelResults = await Promise.all(
+                Array.from({ length: 20 }, () => applyOrderStock(o2))
+            );
+
+            check("twenty concurrent calls deduct once (10 -> 9)",
+                (await stockOf()) === START_STOCK - QTY, `got ${await stockOf()}`);
+            check("exactly one of the twenty won the ledger claim",
+                parallelResults.filter((r) => r.applied).length === 1,
+                `got ${parallelResults.filter((r) => r.applied).length}`);
+
+            /* F3 — an order predating the field must never be claimable, which
+               is what makes deploying this safe without a backfill migration. */
+            await resetStock();
+            const o3 = await makeOrder(`${TAG}-sq-F3-${Date.now()}`);
+            await Order.collection.updateOne(
+                { _id: o3._id },
+                { $unset: { stockApplied: "" } }
+            );
+            const legacyResult = await applyOrderStock(await Order.findById(o3._id));
+
+            check("a legacy order with no stockApplied field is not claimable",
+                legacyResult.applied === false && legacyResult.alreadyApplied === true,
+                JSON.stringify(legacyResult));
+            check("and its stock is left untouched (no double deduction on deploy)",
+                (await stockOf()) === START_STOCK, `got ${await stockOf()}`);
+
+            /* F4 — shortfall. The order is for more than exists, which can only
+               happen to an already-captured payment. Stock must clamp at zero,
+               never go negative, and the difference must be recorded. */
+            await Product.updateOne(
+                { _id: product._id, variants: { $elemMatch: { color: "Blue", size: "M" } } },
+                { $set: { "variants.$.stock": 2 } }
+            );
+            const o4 = await makeOrder(`${TAG}-sq-F4-${Date.now()}`, 5);
+            const shortResult = await applyOrderStock(o4);
+            const heldOrder = await Order.findById(o4._id);
+
+            check("stock clamped at zero rather than going negative",
+                (await stockOf()) === 0, `got ${await stockOf()}`);
+            check("the shortfall was reported to the caller",
+                shortResult.shortfalls.length === 1
+                && shortResult.shortfalls[0].deducted === 2
+                && shortResult.shortfalls[0].shortfall === 3,
+                JSON.stringify(shortResult.shortfalls));
+            check("the order was kept, not discarded (the payment was captured)",
+                heldOrder !== null && heldOrder.isPaid === true);
+            check("the order is flagged for admin review with the line detail",
+                heldOrder.fulfillmentHold === true
+                && heldOrder.stockIssues.length === 1
+                && heldOrder.stockIssues[0].requested === 5
+                && heldOrder.stockIssues[0].deducted === 2,
+                JSON.stringify(heldOrder.stockIssues));
+
+            /* F5 — the decrement lands on the purchased variant only. A product
+               with several colours and sizes must not have a sibling touched. */
+            const multi = await Product.create({
+                name: `${TAG} Multi`,
+                description: TAG,
+                price: 100, gender: "Men", category: "Men's Kurta", weight: 1,
+                variants: [
+                    { color: "Red", size: "S", price: 50, stock: 5 },
+                    { color: "Red", size: "M", price: 55, stock: 6 },
+                    { color: "Blue", size: "S", price: 60, stock: 7 },
+                    { color: "Blue", size: "M", price: 65, stock: 8 },
+                ],
+            });
+
+            const o5 = await Order.create({
+                orderId: `${TAG}-F5-${Date.now()}`,
+                user: user._id,
+                items: [{
+                    productId: multi._id, name: multi.name,
+                    color: "Blue", size: "S", price: 60, quantity: 3,
+                }],
+                shippingAddress,
+                paymentResult: { squareOrderId: `${TAG}-sq-F5-${Date.now()}`, squarePaymentId: "p", status: "COMPLETED" },
+                subtotal: 180, shippingCost: 8, totalAmount: 188,
+                orderStatus: "Paid", isPaid: true, paidAt: new Date(),
+            });
+
+            await applyOrderStock(o5);
+            const after = await Product.findById(multi._id).select("variants");
+            const at = (c, s) => after.variants.find((v) => v.color === c && v.size === s).stock;
+
+            check("the purchased variant (Blue/S) went 7 -> 4",
+                at("Blue", "S") === 4, `got ${at("Blue", "S")}`);
+            check("no sibling variant moved (Red/S 5, Red/M 6, Blue/M 8)",
+                at("Red", "S") === 5 && at("Red", "M") === 6 && at("Blue", "M") === 8,
+                `Red/S=${at("Red", "S")} Red/M=${at("Red", "M")} Blue/M=${at("Blue", "M")}`);
         }
 
         /* ═══════════════════════════════════════════════════════════
