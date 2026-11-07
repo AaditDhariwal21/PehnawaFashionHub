@@ -60,7 +60,6 @@ export const getAllProducts = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error fetching products",
-            error: error.message,
         });
     }
 };
@@ -96,7 +95,6 @@ export const getProductById = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error fetching product",
-            error: error.message,
         });
     }
 };
@@ -134,7 +132,6 @@ export const getProductBySlug = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error fetching product",
-            error: error.message,
         });
     }
 };
@@ -237,7 +234,6 @@ export const getProductsByCategory = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error fetching products by category",
-            error: error.message,
         });
     }
 };
@@ -275,7 +271,6 @@ export const getProductsBySpecialTag = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error fetching products by special tag",
-            error: error.message,
         });
     }
 };
@@ -356,7 +351,6 @@ export const createProduct = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error creating product",
-            error: error.message,
         });
     }
 };
@@ -453,7 +447,6 @@ export const updateProduct = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error updating product",
-            error: error.message,
         });
     }
 };
@@ -479,7 +472,6 @@ export const deleteProduct = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error deleting product",
-            error: error.message,
         });
     }
 };
@@ -508,7 +500,6 @@ export const bulkDeleteProducts = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error deleting products",
-            error: error.message,
         });
     }
 };
@@ -549,7 +540,6 @@ export const searchProducts = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error searching products",
-            error: error.message,
         });
     }
 };
@@ -630,7 +620,6 @@ export const getCategoryCovers = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error fetching category covers",
-            error: error.message,
         });
     }
 };

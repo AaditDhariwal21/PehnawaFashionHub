@@ -21,7 +21,9 @@ import AdminOrdersPage from './pages/AdminOrdersPage';
 import AdminOrderDetailPage from './pages/AdminOrderDetailPage';
 import AdminPromoCodesPage from './pages/AdminPromoCodesPage';
 import OrderConfirmationPage from './pages/OrderConfirmationPage';
+import OrderLookupPage from './pages/OrderLookupPage';
 import { AuthProvider } from './context/AuthContext';
+import ToastProvider from './components/ToastProvider';
 import { CartProvider } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { CompareProvider } from './context/CompareContext';
@@ -37,6 +39,7 @@ function App() {
   return (
     <Router>
       <ScrollToTop />
+      <ToastProvider>
       <AuthProvider>
         <CartProvider>
           <WishlistProvider>
@@ -64,6 +67,9 @@ function App() {
             <Route path="/account/orders/:id" element={<OrderDetailPage />} />
             <Route path="/order-confirmation/:id" element={<OrderConfirmationPage />} />
             <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
+            <Route path="/order-details" element={<OrderLookupPage />} />
+            {/* Earlier name for the same page, kept so any saved link still opens. */}
+            <Route path="/track-order" element={<OrderLookupPage />} />
             <Route path="/wishlist" element={<WishlistPage />} />
             <Route path="/compare" element={<ComparePage />} />
             <Route path="/search" element={<SearchResultsPage />} />
@@ -79,6 +85,7 @@ function App() {
           </WishlistProvider>
         </CartProvider>
       </AuthProvider>
+      </ToastProvider>
     </Router>
   );
 }

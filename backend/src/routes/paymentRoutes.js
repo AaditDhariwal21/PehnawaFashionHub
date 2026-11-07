@@ -1,6 +1,15 @@
 import express from "express";
 import { createCheckoutSession, confirmPayment } from "../controllers/paymentController.js";
 import { verifyToken, blockAdminOrders } from "../middlewares/AuthMiddleware.js";
+import {
+    requireGuestCheckoutEnabled,
+    prepareGuestCheckout,
+} from "../middlewares/GuestCheckoutMiddleware.js";
+import {
+    checkoutLimiter,
+    guestCheckoutEmailLimiter,
+    confirmLimiter,
+} from "../middlewares/RateLimitMiddleware.js";
 
 const router = express.Router();
 
@@ -12,9 +21,21 @@ const router = express.Router();
    an order. */
 
 // POST /api/payments/create-checkout → Create Square checkout session
-router.post("/create-checkout", verifyToken, blockAdminOrders, createCheckoutSession);
+router.post("/create-checkout", checkoutLimiter, verifyToken, blockAdminOrders, createCheckoutSession);
+
+// POST /api/payments/guest/create-checkout → Create Square checkout session without an account
+//   Same handler: identical server-side pricing, stock, shipping and promo
+//   checks. Gated by the GUEST_CHECKOUT_ENABLED flag.
+router.post(
+    "/guest/create-checkout",
+    requireGuestCheckoutEnabled,
+    checkoutLimiter,
+    guestCheckoutEmailLimiter,
+    prepareGuestCheckout,
+    createCheckoutSession
+);
 
 // POST /api/payments/confirm → Confirm payment & create order
-router.post("/confirm", verifyToken, blockAdminOrders, confirmPayment);
+router.post("/confirm", confirmLimiter, verifyToken, blockAdminOrders, confirmPayment);
 
 export default router;

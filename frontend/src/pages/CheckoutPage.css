@@ -145,3 +145,172 @@
 .shipping-spinner {
     animation: spin 0.8s linear infinite;
 }
+
+/* ─── Field hint (shown under a field when it has no error) ─── */
+.field-hint {
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    line-height: 1.4;
+}
+
+/* ─── Signed-out banner ─── */
+.checkout-guest-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.85rem 1rem;
+    margin-bottom: 1.75rem;
+    background: #fffbeb;
+    border: 1px solid #FAD76C;
+    border-radius: 0.6rem;
+    font-size: 0.86rem;
+    color: #374151;
+    line-height: 1.5;
+}
+
+.checkout-link-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0;
+    border: none;
+    background: none;
+    color: #b45309;
+    font: inherit;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+
+@media (min-width: 769px) {
+    .checkout-link-btn {
+        min-height: 0;
+    }
+}
+
+/* ─── Inline error next to Pay ─── */
+.checkout-form-error {
+    margin: 0 0 0.9rem;
+    padding: 0.7rem 0.85rem;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: #991b1b;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 0.5rem;
+}
+
+/* ─── Pay button (summary + mobile sticky bar) ─── */
+.checkout-pay-btn {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.9rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    font-family: inherit;
+    color: #fff;
+    background: linear-gradient(135deg, #EFBF04, #d4a904);
+    border: none;
+    border-radius: 0.6rem;
+    cursor: pointer;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: opacity 0.2s, box-shadow 0.2s;
+    touch-action: manipulation; /* no double-tap-to-zoom delay */
+}
+
+.checkout-pay-btn:disabled {
+    background: #d1d5db;
+    cursor: not-allowed;
+}
+
+@media (hover: hover) {
+    .checkout-pay-btn:not(:disabled):hover {
+        opacity: 0.9;
+        box-shadow: 0 4px 15px rgba(239, 191, 4, 0.4);
+    }
+}
+
+/* ─── Mobile sticky Pay bar ─── */
+.checkout-mobile-cta {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    /* The bar replaces the summary's own button on phones. */
+    .checkout-summary-pay {
+        display: none;
+    }
+
+    .checkout-summary-card {
+        padding: 1.25rem !important;
+    }
+
+    .checkout-mobile-cta {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: var(--pw-z-nav);
+        padding: 0.65rem 1rem calc(0.65rem + var(--pw-safe-bottom));
+        background: #fff;
+        border-top: 1px solid #e5e7eb;
+        box-shadow: 0 -4px 16px rgba(17, 24, 39, 0.06);
+        transition: transform 0.2s ease;
+    }
+
+    .checkout-mobile-cta.is-hidden {
+        transform: translateY(110%);
+        pointer-events: none;
+    }
+
+    .checkout-mobile-cta-total {
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        min-width: 5.5rem;
+        line-height: 1.2;
+    }
+
+    .checkout-mobile-cta-total span {
+        font-size: 0.72rem;
+        color: #6b7280;
+    }
+
+    .checkout-mobile-cta-total strong {
+        font-size: 1.05rem;
+        color: #111827;
+    }
+
+    .checkout-mobile-cta .checkout-pay-btn {
+        flex: 1;
+        min-height: 3rem;
+        padding: 0.75rem;
+        font-size: 0.88rem;
+    }
+
+    /* Room so the end of the page isn't hidden behind the bar. */
+    .checkout-page {
+        padding-bottom: calc(5rem + var(--pw-safe-bottom));
+    }
+
+    /* Promo field: 16px so iOS doesn't zoom on focus, 44px touch targets. */
+    .checkout-page .promo-code-input {
+        font-size: 16px !important;
+        min-height: 2.75rem;
+    }
+
+    .checkout-page .promo-apply-btn {
+        min-height: 2.75rem;
+    }
+}

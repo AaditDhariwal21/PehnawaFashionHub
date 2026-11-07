@@ -61,3 +61,13 @@ export const findVariant = (product, color, size) => {
         (v) => v.color === color && v.size === size
     ) || null;
 };
+
+/**
+ * The image to show for a product in a given colour - the first image of that
+ * colour, else the product's first image. Mirrors getDisplayImages() on the
+ * frontend, so the cart, the order and the product page agree.
+ */
+export const variantImage = (product, color) => {
+    const colorEntry = color ? product?.colors?.find((c) => c.colorName === color) : null;
+    return colorEntry?.images?.[0]?.url || product?.images?.[0]?.url || "";
+};

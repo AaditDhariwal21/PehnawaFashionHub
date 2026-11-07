@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import formatPrice from '../utils/formatPrice';
 import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
@@ -19,6 +20,7 @@ const STATUS_COLORS = {
 const AdminOrderDetailPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { logout } = useAuth();
     const [user, setUser] = useState(null);
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -73,9 +75,11 @@ const AdminOrderDetailPage = () => {
         }
     };
 
+    /* The shared logout: clears storage AND the app's signed-in state (the
+       previous local version left the app thinking the admin was still signed
+       in until a reload), and confirms with a toast. */
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        logout();
         navigate('/');
     };
 
@@ -142,7 +146,25 @@ const AdminOrderDetailPage = () => {
                         <p className="text-sm text-gray-500">
                             Placed on {new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                             {order.user && <> by <strong>{order.user.name}</strong> ({order.user.email})</>}
+                            {!order.user && order.isGuest && <> by <strong>{order.shippingAddress?.fullName || 'a guest'}</strong></>}
                         </p>
+                        {order.isGuest && (
+                            <p className="text-sm" style={{ marginTop: '0.35rem', color: '#374151' }}>
+                                <span style={{
+                                    padding: '0.1rem 0.55rem', borderRadius: '999px', marginRight: '0.5rem',
+                                    fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.03em',
+                                    backgroundColor: '#f3f4f6', border: '1px solid #e5e7eb',
+                                }}>
+                                    GUEST CHECKOUT
+                                </span>
+                                {order.user ? 'Later added to the account above by the customer.' : 'Placed without an account.'}
+                            </p>
+                        )}
+                        {order.contactEmail && (
+                            <p className="text-sm text-gray-500" style={{ marginTop: '0.35rem', overflowWrap: 'anywhere' }}>
+                                Contact email: <a href={`mailto:${order.contactEmail}`} style={{ color: '#b45309', fontWeight: 600 }}>{order.contactEmail}</a>
+                            </p>
+                        )}
                     </div>
                     <span style={{
                         padding: '0.35rem 1rem', borderRadius: '999px',

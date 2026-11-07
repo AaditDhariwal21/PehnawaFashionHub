@@ -2,14 +2,73 @@ import mongoose from "mongoose";
 
 /**
  * Stores checkout session data between Square redirect and payment confirmation.
- * Auto-deletes after 30 minutes via TTL index.
+ *
+ * Lifetime: kept for 7 days (TTL index on createdAt, managed by
+ * config/indexMigrations.js rather than declared here — see below), not 30
+ * minutes as before. A Square payment link does not expire on its own, so a
+ * customer who paid after the old 30-minute TTL had already deleted this
+ * record was charged with no order created. Abandoned checkouts are instead
+ * handled by services/pendingOrderSweeper.js, which deactivates the Square
+ * payment link after an hour; the record itself lingers for the rest of the
+ * week only so that a payment racing that deactivation still becomes an order.
+ *
+ * The TTL index is not declared with `expires` on the field because changing
+ * an existing TTL index's duration requires dropping and recreating it, which
+ * Mongoose's automatic index build cannot do (it would report an options
+ * conflict instead). The startup migration does it explicitly and idempotently.
  */
 const pendingOrderSchema = new mongoose.Schema(
     {
+        /** Absent for guest checkouts. */
         userId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
-            required: true,
+            required: function () {
+                return !this.isGuest;
+            },
+        },
+        isGuest: {
+            type: Boolean,
+            default: false,
+        },
+        /** Email entered at checkout; copied onto the Order. */
+        contactEmail: {
+            type: String,
+            trim: true,
+            lowercase: true,
+        },
+        /** Guest-only. See utils/guestAccess.js. */
+        guest: {
+            emailKey: { type: String },
+            accessTokenHash: { type: String, select: false, index: true },
+        },
+        /**
+         * Client-generated idempotency key for create-checkout. A retried or
+         * double-submitted request with the same key gets the same payment
+         * link back instead of a second one. Partial so records created before
+         * this field existed are not in the index.
+         */
+        checkoutAttemptId: {
+            type: String,
+        },
+        /** Digest of the request a checkoutAttemptId was first used with. */
+        requestFingerprint: { type: String },
+        /** Returned again on an idempotent replay. */
+        checkoutUrl: { type: String },
+        /**
+         * 'cart' — bought from the cart, so a logged-in buyer's saved cart has
+         * those lines removed once the order exists. 'buyNow' — a one-off
+         * purchase that leaves the saved cart alone.
+         */
+        source: {
+            type: String,
+            enum: ["cart", "buyNow"],
+            default: "cart",
+        },
+        /** Set by the sweeper when it deactivated an unpaid payment link. */
+        linkDeactivatedAt: {
+            type: Date,
+            default: null,
         },
         paymentLinkId: {
             type: String,
@@ -73,9 +132,16 @@ const pendingOrderSchema = new mongoose.Schema(
         createdAt: {
             type: Date,
             default: Date.now,
-            expires: 1800, // TTL: auto-delete after 30 minutes
         },
     },
+);
+
+pendingOrderSchema.index(
+    { checkoutAttemptId: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { checkoutAttemptId: { $type: "string" } },
+    }
 );
 
 export default mongoose.model("PendingOrder", pendingOrderSchema);

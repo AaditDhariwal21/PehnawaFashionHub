@@ -52,10 +52,50 @@ const orderSchema = new mongoose.Schema(
             type: String,
             unique: true,
         },
+        /**
+         * The account the order belongs to. Required for every account
+         * order — which is every order that existed before guest checkout —
+         * and absent only on a guest order that hasn't been claimed. Once a
+         * guest claims an order into their account this is set, and the order
+         * appears in that account's history like any other.
+         */
         user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
-            required: true,
+            required: function () {
+                return !this.isGuest;
+            },
+        },
+        /**
+         * Placed through guest checkout. Stays true after a claim, as a record
+         * of how the order was placed. Orders predating guest checkout have no
+         * such field and read as non-guest, which is correct for all of them.
+         */
+        isGuest: {
+            type: Boolean,
+            default: false,
+            index: true,
+        },
+        /**
+         * The email entered at checkout, for the admin to contact the
+         * customer. Account orders pre-fill it with the account email. Absent
+         * on orders placed before this field existed — admin views fall back
+         * to the account's email there.
+         */
+        contactEmail: {
+            type: String,
+            trim: true,
+            lowercase: true,
+        },
+        /** Guest-only fields; absent entirely on account orders. */
+        guest: {
+            /** normalizeEmailKey(contactEmail) — promo per-customer limits. */
+            emailKey: { type: String },
+            /** SHA-256 of the guest's private order link token. Never selected by default. */
+            accessTokenHash: { type: String, select: false },
+            accessTokenExpiresAt: { type: Date },
+            /** When the guest attached this order to their account. */
+            claimedAt: { type: Date },
         },
         items: [orderItemSchema],
         shippingAddress: shippingAddressSchema,
@@ -171,6 +211,25 @@ orderSchema.index(
             "paymentResult.squareOrderId": { $type: "string" },
         },
     }
+);
+
+/**
+ * Guest link lookup. Partial so the (vast majority of) account orders, which
+ * carry no token, are not in the index at all; unique because a token
+ * identifies exactly one order.
+ */
+orderSchema.index(
+    { "guest.accessTokenHash": 1 },
+    {
+        unique: true,
+        partialFilterExpression: { "guest.accessTokenHash": { $type: "string" } },
+    }
+);
+
+/** Promo "first order only" / per-customer checks for guests. */
+orderSchema.index(
+    { "guest.emailKey": 1 },
+    { partialFilterExpression: { "guest.emailKey": { $type: "string" } } }
 );
 
 /**

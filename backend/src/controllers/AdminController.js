@@ -20,7 +20,6 @@ export const getAdminDashboard = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error",
-            error: error.message,
         });
     }
 };
@@ -128,7 +127,6 @@ export const createNewProduct = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error creating product",
-            error: error.message,
             details: error.errors || error,
         });
     }

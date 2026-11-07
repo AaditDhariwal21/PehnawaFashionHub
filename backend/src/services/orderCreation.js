@@ -1,5 +1,12 @@
 import PendingOrder from "../models/PendingOrder.js";
 import Order from "../models/Order.js";
+import Product from "../models/Products.js";
+import Cart from "../models/Cart.js";
+import squareClient from "./squareClient.js";
+import { applyOrderStock } from "./inventory.js";
+import { confirmPromoRedemption } from "./promoService.js";
+import { findVariant } from "../utils/variants.js";
+import { guestLinkExpiry } from "../utils/guestAccess.js";
 
 /**
  * Concurrency safety for order creation.
@@ -147,4 +154,274 @@ export const waitForOrderBySquareOrderId = async (
         await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
     return findOrderBySquareOrderId(squareOrderId);
+};
+
+/* ══════════════════════════════════════════════════════════════
+   Payment verification
+   ══════════════════════════════════════════════════════════════ */
+
+/**
+ * Ask Square, directly, whether the checkout behind a PendingOrder has
+ * actually been paid in full. Nothing a caller was told (a webhook body, a
+ * redirect, a client request) is taken as evidence of payment; only Square's
+ * own records are.
+ *
+ * Previously the webhook path trusted `payment.status` from the event body and
+ * checked only the order's total price, which is fixed when the payment link
+ * is created and is the same whether or not anyone paid. A forged "payment
+ * completed" event for an unpaid checkout would have passed it.
+ *
+ * Paid means all of:
+ *   · the Square order has at least one tender (a payment attached),
+ *   · the payment behind it reports status COMPLETED and belongs to this order,
+ *   · the order total equals what we expected to charge (±1¢ rounding).
+ *
+ * @returns {Promise<
+ *   {ok: true, squarePaymentId: string} |
+ *   {ok: false, reason: "not_paid"|"amount_mismatch"|"square_error", detail?: string}
+ * >}
+ */
+export const verifySquarePayment = async (pending) => {
+    let squareOrder;
+    try {
+        const response = await squareClient.orders.get({ orderId: pending.squareOrderId });
+        squareOrder = response.order;
+    } catch (error) {
+        return { ok: false, reason: "square_error", detail: error?.message };
+    }
+
+    const tenders = squareOrder?.tenders || [];
+    if (tenders.length === 0) return { ok: false, reason: "not_paid", detail: "no tenders" };
+
+    const paidAmountCents = Number(squareOrder.totalMoney?.amount ?? 0);
+    const expectedCents = Math.round(pending.totalAmount * 100);
+    if (Math.abs(paidAmountCents - expectedCents) > 1) {
+        return {
+            ok: false,
+            reason: "amount_mismatch",
+            detail: `Square order total ${paidAmountCents}¢, expected ${expectedCents}¢`,
+        };
+    }
+
+    const squarePaymentId = tenders[0]?.paymentId || tenders[0]?.id || "";
+    if (!squarePaymentId) return { ok: false, reason: "not_paid", detail: "tender without payment id" };
+
+    let payment;
+    try {
+        const response = await squareClient.payments.get({ paymentId: squarePaymentId });
+        payment = response.payment;
+    } catch (error) {
+        return { ok: false, reason: "square_error", detail: error?.message };
+    }
+
+    if (payment?.status !== "COMPLETED") {
+        return { ok: false, reason: "not_paid", detail: `payment status ${payment?.status ?? "unknown"}` };
+    }
+    if (payment.orderId && payment.orderId !== pending.squareOrderId) {
+        return { ok: false, reason: "not_paid", detail: "payment belongs to a different order" };
+    }
+
+    return { ok: true, squarePaymentId };
+};
+
+/* ══════════════════════════════════════════════════════════════
+   PendingOrder → Order
+   ══════════════════════════════════════════════════════════════ */
+
+/**
+ * Remove the purchased lines from a logged-in buyer's saved cart.
+ *
+ * Done here, as part of order creation, rather than by the confirmation page,
+ * so the cart is right even when the webhook created the order and the
+ * customer never came back to the site. Buy Now purchases leave the cart
+ * alone. Never allowed to fail the order.
+ */
+const removePurchasedLinesFromCart = async (pending) => {
+    if (!pending.userId || pending.source === "buyNow") return;
+    try {
+        const lines = (pending.cartItems || []).map((ci) => ({
+            productId: ci.productId,
+            color: ci.color || "",
+            size: ci.size || "",
+        }));
+        if (lines.length === 0) return;
+        await Cart.updateOne(
+            { user: pending.userId },
+            { $pull: { items: { $or: lines } } }
+        );
+    } catch (error) {
+        console.error(`[orderCreation] Could not clear cart lines for Square order ${pending.squareOrderId}:`, error.message);
+    }
+};
+
+/**
+ * Turn a PendingOrder into an Order if, and only if, Square confirms it has
+ * been paid. The one implementation shared by every trigger (the customer's
+ * confirm request, the Square webhooks and the pending-order sweeper) so they
+ * cannot drift apart. The confirm and webhook handlers each used to carry
+ * their own copy of these steps.
+ *
+ * The concurrency layers are unchanged and still apply in this order:
+ * processing lease → unique index on paymentResult.squareOrderId → the
+ * order's own stockApplied ledger. See the header of this module.
+ *
+ * Callers must load `pending` with `+guest.accessTokenHash` selected when it
+ * may be a guest checkout, so the guest's link carries over to the order.
+ *
+ * @returns {Promise<
+ *   {outcome: "created", order, fulfillmentHold: boolean} |
+ *   {outcome: "exists", order} |
+ *   {outcome: "in_progress"} |
+ *   {outcome: "not_paid"|"amount_mismatch"|"square_error", detail?: string} |
+ *   {outcome: "product_missing", message: string}
+ * >}
+ */
+export const finalizePendingOrder = async (pending, { trigger = "unknown" } = {}) => {
+    /* ── 1. Already created by another trigger? ── */
+    const existingOrder = await findOrderBySquareOrderId(pending.squareOrderId);
+    if (existingOrder) {
+        /* Finish the job if whoever created it died before applying stock.
+           applyOrderStock is a no-op once the order's ledger is claimed. */
+        await applyOrderStock(existingOrder);
+        await PendingOrder.deleteOne({ _id: pending._id });
+        return { outcome: "exists", order: existingOrder };
+    }
+
+    /* ── 2. Processing lease, before any real work ── */
+    const claimed = await claimPendingOrder(pending._id);
+    if (!claimed) return { outcome: "in_progress" };
+
+    /* ── 3. Verify the payment with Square itself ── */
+    const verification = await verifySquarePayment(pending);
+    if (!verification.ok) {
+        /* Every bail-out hands the lease back, so the retry these outcomes
+           invite (Square's redelivery, the customer's next confirm, the next
+           sweep) isn't blocked waiting for it to expire. */
+        await releasePendingOrderClaim(pending._id);
+        if (verification.reason !== "not_paid") {
+            console.error(`[orderCreation:${trigger}] ${verification.reason} for Square order ${pending.squareOrderId}: ${verification.detail || ""}`);
+        }
+        return { outcome: verification.reason, detail: verification.detail };
+    }
+
+    /* ── 4. Resolve products + variant prices ── */
+    const resolved = [];
+    for (const ci of pending.cartItems) {
+        const product = await Product.findById(ci.productId);
+        if (!product) {
+            await releasePendingOrderClaim(pending._id);
+            console.error(`[orderCreation:${trigger}] Product not found: ${ci.productId} (Square order ${pending.squareOrderId})`);
+            return { outcome: "product_missing", message: `Product not found: ${ci.productId}` };
+        }
+
+        const variant = findVariant(product, ci.color, ci.size);
+        if (!variant) {
+            await releasePendingOrderClaim(pending._id);
+            console.error(`[orderCreation:${trigger}] Variant ${ci.color}/${ci.size} not found for ${product._id} (Square order ${pending.squareOrderId})`);
+            return {
+                outcome: "product_missing",
+                message: `Variant ${ci.color} / ${ci.size} no longer exists for "${product.name}".`,
+            };
+        }
+
+        resolved.push({
+            product,
+            qty: ci.quantity,
+            price: variant.price,
+            image: ci.image,
+            color: ci.color || "",
+            size: ci.size || "",
+        });
+    }
+
+    /* ── 5. Create the order ──
+       Before the stock is touched, not after. The unique index on
+       paymentResult.squareOrderId makes this insert the single point at which
+       one trigger is chosen for this payment; the loser deducts nothing and so
+       has nothing to compensate. */
+    const orderItems = resolved.map((r) => ({
+        productId: r.product._id,
+        name: r.product.name,
+        image: r.image,
+        color: r.color,
+        size: r.size,
+        price: r.price,
+        quantity: r.qty,
+    }));
+
+    const isGuest = !!pending.isGuest;
+
+    let order;
+    try {
+        order = await Order.create({
+            ...(isGuest ? {} : { user: pending.userId }),
+            isGuest,
+            ...(pending.contactEmail ? { contactEmail: pending.contactEmail } : {}),
+            ...(isGuest
+                ? {
+                    guest: {
+                        emailKey: pending.guest?.emailKey,
+                        accessTokenHash: pending.guest?.accessTokenHash,
+                        accessTokenExpiresAt: guestLinkExpiry(),
+                    },
+                }
+                : {}),
+            items: orderItems,
+            shippingAddress: pending.shippingAddress,
+            paymentMethod: "Square",
+            paymentResult: {
+                squareOrderId: pending.squareOrderId,
+                squarePaymentId: verification.squarePaymentId,
+                status: "COMPLETED",
+            },
+            subtotal: pending.subtotal,
+            discountAmount: pending.discountAmount || 0,
+            promo: pending.promo?.code ? pending.promo : undefined,
+            shippingCost: pending.shippingCost,
+            totalAmount: pending.totalAmount,
+            orderStatus: "Paid",
+            isPaid: true,
+            paidAt: new Date(),
+        });
+    } catch (createErr) {
+        /* No stock has been touched, so there is nothing to give back.
+
+           Backstop fired: the unique index on paymentResult.squareOrderId
+           rejected this insert because another trigger got there first,
+           despite the lease. Deliberately narrow: a collision on the orderId
+           index is a real fault, not a duplicate payment. */
+        if (isDuplicateSquareOrderError(createErr)) {
+            const winner = await findOrderBySquareOrderId(pending.squareOrderId);
+            await PendingOrder.deleteOne({ _id: pending._id });
+            if (winner) {
+                await applyOrderStock(winner);
+                return { outcome: "exists", order: winner };
+            }
+            return { outcome: "in_progress" };
+        }
+
+        await releasePendingOrderClaim(pending._id);
+        throw createErr;
+    }
+
+    /* ── 6. Apply the stock decrements ──
+       A shortfall does not fail the order: the payment is captured, so the
+       order stands and is flagged for admin review. */
+    const stockResult = await applyOrderStock(order);
+
+    /* ── 7. Promote the promo reservation. Idempotent across triggers. ── */
+    await confirmPromoRedemption({
+        squareOrderId: pending.squareOrderId,
+        orderId: order._id,
+    });
+
+    /* ── 8. Saved cart, then clean-up ── */
+    await removePurchasedLinesFromCart(pending);
+    await PendingOrder.deleteOne({ _id: pending._id });
+
+    return {
+        outcome: "created",
+        order,
+        fulfillmentHold: stockResult.shortfalls.length > 0,
+    };
 };

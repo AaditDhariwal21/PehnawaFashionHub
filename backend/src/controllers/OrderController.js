@@ -44,8 +44,11 @@ export const getOrderById = async (req, res) => {
             return res.status(404).json({ success: false, message: "Order not found." });
         }
 
-        /* Non-admin users may only view their own orders */
-        if (req.user.role !== "admin" && order.user._id.toString() !== req.user.id) {
+        /* Non-admin users may only view their own orders. `order.user` is null
+           for an unclaimed guest order and for an order whose account was
+           deleted; both previously crashed here with a 500. */
+        const ownerId = order.user?._id?.toString() ?? null;
+        if (req.user.role !== "admin" && ownerId !== req.user.id) {
             return res.status(403).json({ success: false, message: "Not authorised to view this order." });
         }
 

@@ -34,7 +34,6 @@ export const verifyToken = async (req, res, next) => {
         return res.status(401).json({
             success: false,
             message: "Invalid token.",
-            error: error.message,
         });
     }
 };

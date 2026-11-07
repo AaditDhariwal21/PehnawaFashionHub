@@ -596,7 +596,7 @@ const AdminPromoCodesPage = () => {
                                                             {redemptions.rows.map((r) => (
                                                                 <tr key={r._id} style={{ borderTop: '1px solid #f9fafb' }}>
                                                                     <td className="py-1.5 pr-3 text-gray-700">
-                                                                        {r.user?.email || '—'}
+                                                                        {r.user?.email || (r.guestEmail ? `${r.guestEmail} (guest)` : '—')}
                                                                     </td>
                                                                     <td className="py-1.5 pr-3 text-gray-500">{r.status}</td>
                                                                     <td className="py-1.5 pr-3 text-gray-700">{formatPrice(r.discountAmount)}</td>
