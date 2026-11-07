@@ -30,11 +30,27 @@ const promoRedemptionSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        /** The account that redeemed the code. Absent on a guest redemption. */
         user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
-            required: true,
+            required: function () {
+                return !this.guestEmailKey;
+            },
             index: true,
+        },
+        /**
+         * Guest redemptions are attributed to the checkout email instead of an
+         * account. guestEmailKey is the normalised form (see
+         * normalizeEmailKey) the per-customer limit is enforced on;
+         * guestEmail is the address as entered, for the admin audit view.
+         */
+        guestEmailKey: {
+            type: String,
+            index: true,
+        },
+        guestEmail: {
+            type: String,
         },
         /**
          * Set on CONFIRMED. Null while RESERVED — at reserve time the Order
@@ -97,18 +113,22 @@ const promoRedemptionSchema = new mongoose.Schema(
 );
 
 /**
- * Enforces perUserUsageLimit at the database level. Partial on the two
- * slot-holding states so that RELEASED documents drop out of the index
- * entirely — their slot is freed for reuse while the record is retained for
- * auditing.
+ * perUserUsageLimit is enforced at the database level by two unique partial
+ * indexes, one per kind of customer:
+ *
+ *   promo_user_slot_unique   { promoCode, user, slot }           account redemptions
+ *   promo_guest_slot_unique  { promoCode, guestEmailKey, slot }  guest redemptions
+ *
+ * Both are partial on the two slot-holding states, so RELEASED documents drop
+ * out and their slot is freed for reuse while the record is kept for auditing.
+ *
+ * They are created by config/indexMigrations.js rather than declared here. The
+ * original single index { promoCode, user, slot } did not filter on `user`, so
+ * every guest redemption (no user, indexed as null) would have collided with
+ * every other guest's on slot 0. Replacing it means dropping and recreating an
+ * existing index, which Mongoose's automatic index build cannot do; the
+ * migration does it once, idempotently, at startup.
  */
-promoRedemptionSchema.index(
-    { promoCode: 1, user: 1, slot: 1 },
-    {
-        unique: true,
-        partialFilterExpression: { status: { $in: ["RESERVED", "CONFIRMED"] } },
-    }
-);
 
 /** Drives the stale-reservation sweep. */
 promoRedemptionSchema.index({ status: 1, createdAt: 1 });

@@ -1,0 +1,100 @@
+/* ─── Site-wide toasts (see components/ToastProvider.jsx) ─── */
+
+.pw-toast-viewport {
+    position: fixed;
+    top: calc(var(--pw-nav-h) + var(--pw-safe-top) + 0.75rem);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 650; /* above the navbar, cart drawer and search overlay */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    width: min(26rem, calc(100vw - 2rem));
+    pointer-events: none; /* only the toasts themselves take clicks */
+}
+
+@media (min-width: 1024px) {
+    .pw-toast-viewport {
+        top: calc(var(--pw-nav-h-lg) + 1rem);
+        left: auto;
+        right: 1.5rem;
+        transform: none;
+        align-items: flex-end;
+    }
+}
+
+.pw-toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    width: 100%;
+    padding: 0.7rem 0.5rem 0.7rem 0.85rem;
+    background: #fff;
+    border: 1px solid #f3f4f6;
+    border-left: 4px solid var(--pw-brand);
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 30px rgba(17, 24, 39, 0.12), 0 2px 6px rgba(17, 24, 39, 0.06);
+    animation: pwToastIn 0.25s ease-out;
+}
+
+.pw-toast--success { border-left-color: #10b981; }
+.pw-toast--error { border-left-color: #ef4444; }
+.pw-toast--info { border-left-color: var(--pw-brand); }
+
+.pw-toast-icon {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+}
+
+.pw-toast--success .pw-toast-icon { background: #d1fae5; color: #065f46; }
+.pw-toast--error .pw-toast-icon { background: #fee2e2; color: #991b1b; }
+.pw-toast--info .pw-toast-icon { background: #fef3c7; color: #92400e; }
+
+.pw-toast-message {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--pw-ink);
+}
+
+.pw-toast-close {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;  /* 44px touch target */
+    height: 2.75rem;
+    margin: -0.4rem 0;
+    padding: 0;
+    border: none;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: #9ca3af;
+    cursor: pointer;
+}
+
+@media (hover: hover) {
+    .pw-toast-close:hover {
+        color: var(--pw-ink);
+        background: #f9fafb;
+    }
+}
+
+@keyframes pwToastIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pw-toast { animation: none; }
+}

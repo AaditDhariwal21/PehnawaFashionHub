@@ -2,7 +2,9 @@ import PromoCode from "../models/PromoCode.js";
 import PromoRedemption from "../models/PromoRedemption.js";
 import Product from "../models/Products.js";
 import Order from "../models/Order.js";
+import User from "../models/Users.js";
 import { findVariant } from "../utils/variants.js";
+import { normalizeEmailKey } from "../utils/checkoutValidation.js";
 
 /**
  * Promo code validation, discount computation and usage accounting.
@@ -31,11 +33,13 @@ export const PROMO_ERRORS = {
 };
 
 /**
- * A reservation whose customer never came back from Square. PendingOrder's own
- * TTL is 30 minutes; this sits comfortably past it so a slot is never released
- * while its checkout is still confirmable.
+ * A reservation whose customer never came back from Square. The pending-order
+ * sweeper deactivates an unpaid payment link after 60 minutes and releases its
+ * reservation itself (services/pendingOrderSweeper.js); this sits past that as
+ * a backstop for anything the sweeper missed, so a slot is never released while
+ * its payment link can still be paid.
  */
-const STALE_RESERVATION_MS = 45 * 60 * 1000;
+const STALE_RESERVATION_MS = 75 * 60 * 1000;
 
 /** Money is stored in dollars throughout this codebase, so round to cents. */
 const round2 = (n) => Math.round(n * 100) / 100;
@@ -156,6 +160,53 @@ export const computeDiscount = (promo, eligibleSubtotal) => {
 };
 
 /* ══════════════════════════════════════════════════════════════
+   Customer identity
+   ══════════════════════════════════════════════════════════════ */
+
+/**
+ * Who a per-customer promo rule applies to.
+ *
+ * An account customer is identified by user id; a guest by the normalised
+ * checkout email. The two are joined in both directions, so a person can't
+ * double a one-per-customer code by using it once as a guest and once from
+ * their account with the same email (or vice versa).
+ *
+ * Returns null when there is no customer to check: the advisory guest "Apply"
+ * check, which runs before an email has been entered. The authoritative check
+ * at create-checkout always has one.
+ *
+ * @returns {Promise<{redemptionOr: object[], orderOr: object[]}|null>}
+ */
+export const resolvePromoCustomer = async ({ userId = null, guestEmail = null } = {}) => {
+    const redemptionOr = [];
+    const orderOr = [];
+
+    if (userId) {
+        redemptionOr.push({ user: userId });
+        orderOr.push({ user: userId });
+        const account = await User.findById(userId).select("email").lean();
+        if (account?.email) {
+            const key = normalizeEmailKey(account.email);
+            redemptionOr.push({ guestEmailKey: key });
+            orderOr.push({ "guest.emailKey": key });
+        }
+    } else if (guestEmail) {
+        const key = normalizeEmailKey(guestEmail);
+        redemptionOr.push({ guestEmailKey: key });
+        orderOr.push({ "guest.emailKey": key });
+        const account = await User.findOne({ email: String(guestEmail).toLowerCase() }).select("_id").lean();
+        if (account) {
+            redemptionOr.push({ user: account._id });
+            orderOr.push({ user: account._id });
+        }
+    } else {
+        return null;
+    }
+
+    return { redemptionOr, orderOr };
+};
+
+/* ══════════════════════════════════════════════════════════════
    Validation — the single source of truth
    ══════════════════════════════════════════════════════════════ */
 
@@ -167,10 +218,14 @@ const fail = (code, message, extra = {}) => ({ ok: false, code, message, ...extr
  *
  * @param {object}  params
  * @param {string}  params.code      raw code as typed
- * @param {string}  params.userId
+ * @param {string}  [params.userId]     account customer
+ * @param {string}  [params.guestEmail] guest customer (an already-validated email)
  * @param {Array}   params.lineItems from resolveCartForPromo()/toPromoLineItem()
+ *
+ * With neither userId nor guestEmail, the per-customer rules (6 and 7) are
+ * skipped. Only the advisory guest "Apply" check calls it that way.
  */
-export const validatePromoForCart = async ({ code, userId, lineItems }) => {
+export const validatePromoForCart = async ({ code, userId = null, guestEmail = null, lineItems }) => {
     const normalized = normalizeCode(code);
     if (!normalized) {
         return fail(PROMO_ERRORS.CODE_REQUIRED, "Please enter a promo code.");
@@ -229,12 +284,16 @@ export const validatePromoForCart = async ({ code, userId, lineItems }) => {
         }
     }
 
-    /* ── 6. Per-user usage limit ── */
-    const userUses = await PromoRedemption.countDocuments({
-        promoCode: promo._id,
-        user: userId,
-        status: { $in: ["RESERVED", "CONFIRMED"] },
-    });
+    const customer = await resolvePromoCustomer({ userId, guestEmail });
+
+    /* ── 6. Per-customer usage limit ── */
+    const userUses = customer
+        ? await PromoRedemption.countDocuments({
+            promoCode: promo._id,
+            status: { $in: ["RESERVED", "CONFIRMED"] },
+            $or: customer.redemptionOr,
+        })
+        : 0;
     if (userUses >= promo.perUserUsageLimit) {
         return fail(
             PROMO_ERRORS.USER_LIMIT_REACHED,
@@ -247,8 +306,8 @@ export const validatePromoForCart = async ({ code, userId, lineItems }) => {
     /* ── 7. First-order-only eligibility. Every Order in this system is
            created only after Square confirms payment, so any existing order
            means this isn't a first order. ── */
-    if (promo.firstOrderOnly) {
-        const previousOrders = await Order.countDocuments({ user: userId });
+    if (promo.firstOrderOnly && customer) {
+        const previousOrders = await Order.countDocuments({ $or: customer.orderOr });
         if (previousOrders > 0) {
             return fail(
                 PROMO_ERRORS.FIRST_ORDER_ONLY,
@@ -303,7 +362,12 @@ export const validatePromoForCart = async ({ code, userId, lineItems }) => {
  * (promoCode, user, slot): concurrent requests compute the same slot number
  * and exactly one insert survives.
  */
-export const reservePromoCode = async ({ promo, userId, discountAmount, squareOrderId }) => {
+export const reservePromoCode = async ({ promo, userId = null, guestEmail = null, discountAmount, squareOrderId }) => {
+    const customer = await resolvePromoCustomer({ userId, guestEmail });
+    if (!customer) {
+        return { ok: false, code: PROMO_ERRORS.USER_LIMIT_REACHED, message: "Please enter your email to use a promo code." };
+    }
+
     const now = new Date();
 
     /* Re-assert the whole gate inside the filter, not just the counter. An
@@ -333,10 +397,12 @@ export const reservePromoCode = async ({ promo, userId, discountAmount, squareOr
     const rollback = () =>
         PromoCode.updateOne({ _id: promo._id }, { $inc: { usedCount: -1 } });
 
+    /* Counted across both identities (see resolvePromoCustomer), while the slot
+       number is unique only within this redemption's own identity index. */
     const heldSlots = await PromoRedemption.countDocuments({
         promoCode: promo._id,
-        user: userId,
         status: { $in: ["RESERVED", "CONFIRMED"] },
+        $or: customer.redemptionOr,
     });
 
     if (heldSlots >= promo.perUserUsageLimit) {
@@ -352,7 +418,9 @@ export const reservePromoCode = async ({ promo, userId, discountAmount, squareOr
         const redemption = await PromoRedemption.create({
             promoCode: promo._id,
             code: promo.code,
-            user: userId,
+            ...(userId
+                ? { user: userId }
+                : { guestEmailKey: normalizeEmailKey(guestEmail), guestEmail: String(guestEmail).toLowerCase() }),
             squareOrderId,
             discountAmount,
             status: "RESERVED",
@@ -392,6 +460,27 @@ export const confirmPromoRedemption = async ({ squareOrderId, orderId }) => {
     );
 
     if (confirmed) return confirmed;
+
+    /* Paid after the reservation was released: the sweeper deactivated the
+       link, but the payment raced it. The discount was charged, so record the
+       use rather than lose it. This can take a limited code one past its limit,
+       which is the honest outcome for a payment already captured. If the slot
+       has since been taken by another reservation of the same customer, the
+       unique index refuses and the release stands (logged for the admin). */
+    try {
+        const revived = await PromoRedemption.findOneAndUpdate(
+            { squareOrderId, status: "RELEASED" },
+            { $set: { status: "CONFIRMED", order: orderId, releasedAt: null } },
+            { new: true }
+        );
+        if (revived) {
+            await PromoCode.updateOne({ _id: revived.promoCode }, { $inc: { usedCount: 1 } });
+            console.warn(`[promo] Late payment confirmed a released reservation for ${revived.code} (Square order ${squareOrderId}).`);
+            return revived;
+        }
+    } catch (error) {
+        console.error(`[promo] Could not revive released reservation for Square order ${squareOrderId}:`, error.message);
+    }
 
     // Either the other path already confirmed it, or there was no promo.
     return PromoRedemption.findOne({ squareOrderId, status: "CONFIRMED" });

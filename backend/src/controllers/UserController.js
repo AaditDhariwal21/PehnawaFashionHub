@@ -31,7 +31,6 @@ export const getMe = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error fetching profile",
-            error: error.message,
         });
     }
 };
@@ -119,7 +118,6 @@ export const updateAddress = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error updating address",
-            error: error.message,
         });
     }
 };

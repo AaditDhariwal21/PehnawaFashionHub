@@ -1,10 +1,12 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { useToast } from '../utils/toast';
 
 const AuthContext = createContext(null);
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export const AuthProvider = ({ children }) => {
+    const toast = useToast();
     const [user, setUser] = useState(() => {
         const stored = localStorage.getItem('user');
         const token = localStorage.getItem('token');
@@ -46,6 +48,8 @@ export const AuthProvider = ({ children }) => {
         // Reset all auth state
         setUser(null);
         setViewMode('admin');
+
+        toast.success('Logged out successfully');
     };
 
     const updateUser = (updates) => {

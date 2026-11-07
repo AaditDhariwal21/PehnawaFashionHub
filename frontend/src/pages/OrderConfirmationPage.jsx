@@ -1,37 +1,154 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Copy, Check, Link2 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import OrderReceipt from '../components/OrderReceipt.jsx';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import formatPrice from '../utils/formatPrice';
 import './OrderConfirmationPage.css';
-import CloudinaryImage from '../components/CloudinaryImage.jsx';
+import {
+    readGuestCheckout,
+    clearGuestCheckout,
+    readConfirmedGuestOrder,
+    saveConfirmedGuestOrder,
+    readCheckoutSource,
+    guestOrderLink,
+} from '../utils/guestCheckout';
 
 const API = import.meta.env.VITE_API_URL;
 
-const STATUS_COLORS = {
-    Pending: { bg: '#fef3c7', color: '#92400e' },
-    Paid: { bg: '#d1fae5', color: '#065f46' },
-    Processing: { bg: '#dbeafe', color: '#1e40af' },
-    Shipped: { bg: '#e0e7ff', color: '#3730a3' },
-    Delivered: { bg: '#d1fae5', color: '#065f46' },
-    Cancelled: { bg: '#fee2e2', color: '#991b1b' },
+const MAX_POLLS = 5;
+const POLL_INTERVAL = 3000; // 3 seconds
+
+/**
+ * "Save this link" — the guest's private, bookmarkable way back to the order.
+ * There is no account and no email, so this link (plus order number + email
+ * lookup on the order details page) is how a guest finds their order again.
+ */
+const SaveOrderLink = ({ token }) => {
+    const [copied, setCopied] = useState(false);
+    const link = guestOrderLink(token);
+
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(link);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2500);
+        } catch {
+            window.prompt('Copy your order link:', link);
+        }
+    };
+
+    return (
+        <div className="ocp-card ocp-save-link">
+            <h2 className="ocp-card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Link2 size={18} aria-hidden="true" /> Save your order link
+            </h2>
+            <p className="ocp-save-link-text">
+                You checked out as a guest, so this private link is how you get back to this order to check its
+                status. Bookmark it or keep it somewhere safe — anyone with the link can see the order.
+            </p>
+            <div className="ocp-save-link-row">
+                <input
+                    className="ocp-save-link-input"
+                    value={link}
+                    readOnly
+                    aria-label="Your private order link"
+                    onFocus={(e) => e.target.select()}
+                />
+                <button type="button" className="ocp-btn-primary ocp-copy-btn" onClick={copy}>
+                    {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
+                    {copied ? 'Copied' : 'Copy link'}
+                </button>
+            </div>
+            <p className="ocp-save-link-text" style={{ marginTop: '0.75rem', marginBottom: 0 }}>
+                Lost it? Use <Link to="/order-details">Get order details</Link> with your order ID and email.
+            </p>
+        </div>
+    );
 };
 
 const OrderConfirmationPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { clearCart, clearBuyNowItem } = useCart();
+    const { clearCart, refreshCart, clearBuyNowItem } = useCart();
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    /** Guest only: the private token for the order on screen. */
+    const [guestToken, setGuestToken] = useState(null);
+    const [guestEmail, setGuestEmail] = useState('');
     const confirmedRef = useRef(false);
 
     useEffect(() => {
-        if (!user) { navigate('/signin'); return; }
         if (confirmedRef.current) return;
+
+        /* ── Guest: returning from Square after a guest checkout ──
+           Recognised by the checkout record saved just before the redirect, or
+           (on a refresh) by the confirmed order kept for this tab. */
+        if (!user) {
+            const pending = readGuestCheckout();
+            const confirmed = readConfirmedGuestOrder();
+            const token = pending?.token || confirmed?.token;
+            if (!token || id) { navigate('/signin'); return; }
+
+            confirmedRef.current = true;
+
+            const showOrder = (guestOrder) => {
+                /* Done with the browser-side checkout state. The cart is cleared
+                   only for a cart checkout — Buy Now leaves it alone. */
+                if (pending) {
+                    if (pending.source === 'buyNow') clearBuyNowItem();
+                    else { clearCart(); clearBuyNowItem(); }
+                    clearGuestCheckout();
+                }
+                saveConfirmedGuestOrder({ token, email: pending?.email || confirmed?.email || '' });
+                setGuestToken(token);
+                setGuestEmail(pending?.email || confirmed?.email || '');
+                setOrder(guestOrder);
+                setLoading(false);
+            };
+
+            const post = async (path, body) => {
+                const res = await fetch(`${API}/orders/guest/${path}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                return { status: res.status, data: await res.json().catch(() => ({})) };
+            };
+
+            /* Same shape as the signed-in flow: poll for the order the webhook
+               creates, then fall back to confirming the payment ourselves. */
+            const pollGuest = async (attempt = 1) => {
+                try {
+                    const { data } = await post('view', { token });
+                    if (data.success && data.order) { showOrder(data.order); return; }
+                } catch (err) {
+                    console.warn(`[Poll ${attempt}] Error:`, err.message);
+                }
+
+                if (attempt < MAX_POLLS) {
+                    setTimeout(() => pollGuest(attempt + 1), POLL_INTERVAL);
+                    return;
+                }
+
+                try {
+                    const { data } = await post('confirm', { token, squareOrderId: pending?.squareOrderId });
+                    if (data.success && data.order) { showOrder(data.order); return; }
+                    setError(data.message || 'Unable to confirm your payment. Please contact support.');
+                } catch (err) {
+                    console.error('Payment verification error:', err);
+                    setError('Unable to confirm your payment. Please contact support.');
+                }
+                setLoading(false);
+            };
+
+            pollGuest();
+            return;
+        }
 
         const token = localStorage.getItem('token');
 
@@ -60,8 +177,18 @@ const OrderConfirmationPage = () => {
          */
         confirmedRef.current = true;
 
-        const MAX_POLLS = 5;
-        const POLL_INTERVAL = 3000; // 3 seconds
+        /* The saved cart is server-side now: whichever trigger created the
+           order already removed the purchased lines, so the cart is simply
+           re-read. A Buy Now purchase never touched the cart. */
+        const finishCheckout = () => {
+            if (readCheckoutSource() === 'buyNow') clearBuyNowItem();
+            else { refreshCart(); clearBuyNowItem(); }
+            try {
+                sessionStorage.removeItem('pehnawa_squareOrderId');
+            } catch {
+                /* ignore */
+            }
+        };
 
         const pollForOrder = async (attempt = 1) => {
             try {
@@ -71,9 +198,7 @@ const OrderConfirmationPage = () => {
                 const data = await res.json();
 
                 if (data.success && data.order) {
-                    clearCart();
-                    clearBuyNowItem();
-                    sessionStorage.removeItem('pehnawa_squareOrderId');
+                    finishCheckout();
                     setOrder(data.order);
                     setLoading(false);
                     return;
@@ -91,7 +216,12 @@ const OrderConfirmationPage = () => {
             /* ── Fallback: use the old verify endpoint ── */
             console.log('[OrderConfirmation] Polling exhausted — falling back to verify endpoint.');
             try {
-                const storedOrderId = sessionStorage.getItem('pehnawa_squareOrderId');
+                let storedOrderId = null;
+                try {
+                    storedOrderId = sessionStorage.getItem('pehnawa_squareOrderId');
+                } catch {
+                    /* ignore */
+                }
                 const res = await fetch(`${API}/orders/verify-square-payment`, {
                     method: 'POST',
                     headers: {
@@ -105,9 +235,7 @@ const OrderConfirmationPage = () => {
                 const data = await res.json();
 
                 if (data.success && data.order) {
-                    clearCart();
-                    clearBuyNowItem();
-                    sessionStorage.removeItem('pehnawa_squareOrderId');
+                    finishCheckout();
                     setOrder(data.order);
                 } else {
                     setError(data.message || 'Unable to confirm your payment. Please contact support.');
@@ -121,14 +249,14 @@ const OrderConfirmationPage = () => {
         };
 
         pollForOrder();
-    }, [id, user, navigate, clearCart]);
+    }, [id, user, navigate, clearCart, refreshCart, clearBuyNowItem]);
 
     /* ─── Loading State ─── */
     if (loading) {
         return (
             <div className="ocp">
                 <Navbar />
-                <div className="ocp-wrapper" style={{ textAlign: 'center', paddingTop: '4rem', minHeight: '50vh' }}>
+                <div className="ocp-wrapper" style={{ textAlign: 'center', paddingTop: '4rem', minHeight: '50vh' }} role="status" aria-live="polite">
                     <div style={{
                         width: '3rem', height: '3rem', borderRadius: '50%',
                         border: '4px solid #e5e7eb', borderTopColor: '#EFBF04',
@@ -198,8 +326,7 @@ const OrderConfirmationPage = () => {
     }
 
     /* ─── Success — Show Order Details ─── */
-    const sc = STATUS_COLORS[order.orderStatus] || STATUS_COLORS.Paid;
-    const addr = order.shippingAddress || {};
+    const isGuestView = !user && !!guestToken;
 
     return (
         <div className="ocp">
@@ -219,81 +346,41 @@ const OrderConfirmationPage = () => {
                     </p>
                 </div>
 
-                {/* ── Order Info Row ── */}
-                <div className="ocp-meta-row">
-                    <div className="ocp-meta-item">
-                        <span className="ocp-meta-label">Order ID</span>
-                        <span className="ocp-meta-value">{order.orderId}</span>
-                    </div>
-                    <div className="ocp-meta-item">
-                        <span className="ocp-meta-label">Order Date</span>
-                        <span className="ocp-meta-value">
-                            {new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                        </span>
-                    </div>
-                    <div className="ocp-meta-item">
-                        <span className="ocp-meta-label">Payment Status</span>
-                        <span className="ocp-status-badge" style={{ backgroundColor: sc.bg, color: sc.color }}>
-                            {order.orderStatus}
-                        </span>
-                    </div>
-                </div>
+                <OrderReceipt order={order} />
 
-                {/* ── Two-column: Items + Shipping ── */}
-                <div className="ocp-grid">
-                    {/* Items Ordered */}
-                    <div className="ocp-card">
-                        <h2 className="ocp-card-title">Items Ordered</h2>
-                        <div className="ocp-items">
-                            {order.items.map((item, i) => (
-                                <div key={i} className="ocp-item">
-                                    <CloudinaryImage src={item.image} alt={item?.name || "Product Image"} preset="cartThumb" className="ocp-item-img" />
-                                    <div className="ocp-item-info">
-                                        <p className="ocp-item-name">{item.name}</p>
-                                        {item.size && <p className="ocp-item-size">Size: {item.size}</p>}
-                                        <p className="ocp-item-qty">Qty: {item.quantity}</p>
-                                    </div>
-                                    <span className="ocp-item-price">{formatPrice(item.price * item.quantity)}</span>
-                                </div>
-                            ))}
-                        </div>
+                {isGuestView && <SaveOrderLink token={guestToken} />}
 
-                        {/* Totals */}
-                        <div className="ocp-totals">
-                            <div className="ocp-total-row">
-                                <span>Subtotal</span>
-                                <span>{formatPrice(order.subtotal)}</span>
-                            </div>
-                            <div className="ocp-total-row">
-                                <span>Shipping</span>
-                                <span>{formatPrice(order.shippingCost)}</span>
-                            </div>
-                            <div className="ocp-total-row ocp-total-final">
-                                <span>Total Paid</span>
-                                <span>{formatPrice(order.totalAmount)}</span>
-                            </div>
+                {isGuestView && (
+                    <div className="ocp-card ocp-account-cta">
+                        <div>
+                            <h2 className="ocp-card-title" style={{ marginBottom: '0.35rem' }}>Want to see this in My Orders?</h2>
+                            <p className="ocp-save-link-text" style={{ margin: 0 }}>
+                                Create an account with the same email and this order is added to it automatically. Optional — your order is placed either way.
+                            </p>
                         </div>
+                        <button
+                            type="button"
+                            className="ocp-btn-secondary"
+                            onClick={() => navigate('/signin', {
+                                state: { mode: 'signup', email: guestEmail, claimToken: guestToken },
+                            })}
+                        >
+                            Create an account
+                        </button>
                     </div>
-
-                    {/* Shipping Address */}
-                    <div className="ocp-card">
-                        <h2 className="ocp-card-title">Shipping Address</h2>
-                        <div className="ocp-addr">
-                            <p className="ocp-addr-name">{addr.fullName}</p>
-                            <p>{addr.addressLine1}</p>
-                            {addr.addressLine2 && <p>{addr.addressLine2}</p>}
-                            <p>{addr.city}, {addr.state} {addr.zipCode}</p>
-                            <p>{addr.country}</p>
-                            {addr.phone && <p className="ocp-addr-phone">📞 {addr.phone}</p>}
-                        </div>
-                    </div>
-                </div>
+                )}
 
                 {/* ── Action Buttons ── */}
                 <div className="ocp-actions">
-                    <button className="ocp-btn-primary" onClick={() => navigate('/account', { state: { tab: 'orders' } })}>
-                        View Your Orders
-                    </button>
+                    {isGuestView ? (
+                        <button className="ocp-btn-primary" onClick={() => navigate(`/order-details#t=${guestToken}`)}>
+                            View order details
+                        </button>
+                    ) : (
+                        <button className="ocp-btn-primary" onClick={() => navigate('/account', { state: { tab: 'orders' } })}>
+                            View Your Orders
+                        </button>
+                    )}
                     <button className="ocp-btn-secondary" onClick={() => navigate('/')}>
                         Continue Shopping
                     </button>

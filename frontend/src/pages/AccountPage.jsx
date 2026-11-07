@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +18,26 @@ const STATUS_COLORS = {
     Delivered: { bg: '#d1fae5', color: '#065f46' },
     Cancelled: { bg: '#fee2e2', color: '#991b1b' },
 };
+
+/* One short line under each status, in the customer's terms. Statuses are set
+   by the store, so these describe the order — not a courier's tracking feed. */
+const STATUS_NOTES = {
+    Pending: 'Awaiting payment',
+    Paid: 'Payment received',
+    Processing: 'Being prepared',
+    Shipped: 'On its way',
+    Delivered: 'Delivered',
+    Cancelled: 'Order cancelled',
+};
+
+const formatOrderDate = (value) =>
+    new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+/** "Size M · Red · Qty 2" — only the parts the item actually has. */
+const itemDetails = (item) =>
+    [item?.size && `Size ${item.size}`, item?.color, item?.quantity && `Qty ${item.quantity}`]
+        .filter(Boolean)
+        .join(' · ');
 
 const AccountPage = () => {
     const navigate = useNavigate();
@@ -382,7 +403,7 @@ const AccountPage = () => {
                     {activeTab === 'orders' && (
                         <div className="account-orders-panel">
                             <h1>Your Orders</h1>
-                            <p className="account-info-sub">Track and manage your purchases</p>
+                            <p className="account-info-sub">View and manage your purchases</p>
 
                             {ordersLoading ? (
                                 <div className="account-orders-empty">
@@ -406,44 +427,59 @@ const AccountPage = () => {
                                     {orders.map((order) => {
                                         const sc = STATUS_COLORS[order.orderStatus] || STATUS_COLORS.Pending;
                                         const firstItem = order.items?.[0];
-                                        const extraCount = (order.items?.length || 1) - 1;
+                                        const extraCount = Math.max(0, (order.items?.length || 1) - 1);
+                                        const detailsUrl = `/account/orders/${order._id}`;
+                                        const details = itemDetails(firstItem);
                                         return (
-                                            <div key={order._id} className="account-order-card">
-                                                <div className="account-order-row">
-                                                    {/* Left: Product thumbnail */}
-                                                    <div className="account-order-thumb-wrap">
-                                                        <div className="account-order-thumb">
-                                                            {firstItem?.image ? (
-                                                                <CloudinaryImage src={firstItem.image} alt={firstItem?.name || "Product Image"} preset="cartThumb" />
-                                                            ) : (
-                                                                <span className="account-order-thumb-placeholder">📦</span>
-                                                            )}
-                                                        </div>
-                                                        {extraCount > 0 && (
-                                                            <p className="account-order-more">+{extraCount} more</p>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Middle: Order info */}
-                                                    <div className="account-order-info">
-                                                        <p className="account-order-id">{order.orderId}</p>
-                                                        <p className="account-order-date">
-                                                            {new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                                                        </p>
-                                                        <p className="account-order-total">{formatPrice(order.totalAmount)}</p>
-                                                    </div>
-
-                                                    {/* Right: Status + Action */}
-                                                    <div className="account-order-actions">
+                                            <article key={order._id} className="account-order-card">
+                                                {/* Status first, then when — what a customer scans for */}
+                                                <header className="account-order-head">
+                                                    <div className="account-order-status">
                                                         <span className="account-order-badge" style={{ backgroundColor: sc.bg, color: sc.color }}>
                                                             {order.orderStatus}
                                                         </span>
-                                                        <button className="account-order-view-btn" onClick={() => navigate(`/account/orders/${order._id}`)}>
-                                                            View Details
-                                                        </button>
+                                                        {STATUS_NOTES[order.orderStatus] && STATUS_NOTES[order.orderStatus] !== order.orderStatus && (
+                                                            <span className="account-order-status-note">{STATUS_NOTES[order.orderStatus]}</span>
+                                                        )}
+                                                    </div>
+                                                    <p className="account-order-date">
+                                                        <span className="account-order-label">Ordered on:</span>{' '}
+                                                        <time dateTime={order.createdAt}>{formatOrderDate(order.createdAt)}</time>
+                                                    </p>
+                                                </header>
+
+                                                <div className="account-order-body">
+                                                    <Link to={detailsUrl} className="account-order-thumb" tabIndex={-1} aria-hidden="true">
+                                                        <CloudinaryImage src={firstItem?.image} alt="" preset="orderThumb" />
+                                                    </Link>
+
+                                                    <div className="account-order-main">
+                                                        <h3 className="account-order-title">
+                                                            <Link to={detailsUrl}>{firstItem?.name || 'Your order'}</Link>
+                                                        </h3>
+                                                        {details && <p className="account-order-variant">{details}</p>}
+                                                        {extraCount > 0 && (
+                                                            <p className="account-order-more">
+                                                                + {extraCount} more {extraCount === 1 ? 'item' : 'items'}
+                                                            </p>
+                                                        )}
+                                                        <p className="account-order-total">
+                                                            <span className="account-order-label">Order total:</span>{' '}
+                                                            <strong>{formatPrice(order.totalAmount)}</strong>
+                                                        </p>
                                                     </div>
                                                 </div>
-                                            </div>
+
+                                                <footer className="account-order-foot">
+                                                    <p className="account-order-id">
+                                                        <span className="account-order-label">Order ID:</span> {order.orderId}
+                                                    </p>
+                                                    <button className="account-order-view-btn" onClick={() => navigate(detailsUrl)}>
+                                                        View details
+                                                        <ChevronRight size={16} strokeWidth={2.4} aria-hidden="true" />
+                                                    </button>
+                                                </footer>
+                                            </article>
                                         );
                                     })}
                                 </div>

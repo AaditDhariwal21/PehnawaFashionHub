@@ -26,7 +26,9 @@ const MobileBottomNav = () => {
     const isAdminRoute = path === '/adminDashboard' || path.startsWith('/admin/');
     // Auth is a focused, full-screen gate — the tab bar is hidden there
     // (matches Myntra/Flipkart) so nothing competes with the sign-in card.
-    const isHiddenRoute = isAdminRoute || path === '/signin';
+    // Checkout is the same kind of focused flow, and its own sticky Pay bar
+    // takes this space on phones.
+    const isHiddenRoute = isAdminRoute || path === '/signin' || path === '/checkout';
 
     // Reserve page space only while the nav is actually present.
     useEffect(() => {

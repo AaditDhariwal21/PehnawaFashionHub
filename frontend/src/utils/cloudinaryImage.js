@@ -30,6 +30,30 @@
 const UPLOAD_MARKER = "/image/upload/";
 
 /**
+ * Retired Cloudinary accounts → the account that now holds the same assets.
+ *
+ * The store moved from the `dvgvhqx1u` cloud to `pehnawa`. Product records were
+ * rewritten at the time (scripts/updateCloudinaryUrls.js), but every order line
+ * item keeps its own snapshot of the image URL from the moment it was placed,
+ * and those were never rewritten — so older orders point at the retired
+ * account, whose URLs now return 404 (broken thumbnails in "Your Orders" and
+ * the admin order list). The assets exist under the new account at exactly the
+ * same path, so mapping the account name here fixes every such URL at display
+ * time without touching any stored data.
+ */
+const LEGACY_CLOUDS = {
+    dvgvhqx1u: "pehnawa",
+};
+
+/** Rewrite a URL on a retired Cloudinary account to the current one. Anything else is returned as-is. */
+export function currentCloudinaryUrl(url) {
+    if (typeof url !== "string") return url;
+    const match = url.match(/^(https?:\/\/res\.cloudinary\.com\/)([^/]+)(\/.*)$/);
+    if (!match || !LEGACY_CLOUDS[match[2]]) return url;
+    return `${match[1]}${LEGACY_CLOUDS[match[2]]}${match[3]}`;
+}
+
+/**
  * True when `url` is a Cloudinary delivery URL we can transform.
  */
 function isCloudinaryUrl(url) {
@@ -56,10 +80,13 @@ function hasExistingTransform(afterUpload) {
  * Build the transformation string from options. Order is cosmetic to Cloudinary
  * but kept stable so generated URLs are cache-friendly and diff-friendly.
  */
-function buildTransform({ width, height, crop = "limit", quality = "auto", format = "auto", extra } = {}) {
+function buildTransform({ width, height, aspect, crop = "limit", quality = "auto", format = "auto", extra } = {}) {
     const parts = [`f_${format}`, `q_${quality}`, `c_${crop}`];
+    /* `aspect` (height ÷ width) derives the height from each requested width,
+       so every srcset candidate is cropped to the same shape. */
+    const h = height || (aspect && width ? width * aspect : undefined);
     if (width) parts.push(`w_${Math.round(width)}`);
-    if (height) parts.push(`h_${Math.round(height)}`);
+    if (h) parts.push(`h_${Math.round(h)}`);
     if (extra) parts.push(extra);
     return parts.join(",");
 }
@@ -68,7 +95,8 @@ function buildTransform({ width, height, crop = "limit", quality = "auto", forma
  * Return `url` with a Cloudinary transformation injected. Safe on any input:
  * non-Cloudinary or empty values come back unchanged.
  */
-export function cloudinaryUrl(url, options = {}) {
+export function cloudinaryUrl(rawUrl, options = {}) {
+    const url = currentCloudinaryUrl(rawUrl);
     if (!isCloudinaryUrl(url)) return url;
 
     const idx = url.indexOf(UPLOAD_MARKER);
@@ -142,6 +170,18 @@ export const IMAGE_PRESETS = {
         sizes: "96px",
         quality: "auto",
     },
+    // "Your Orders" cards: a 4:5 portrait slot, 88px wide on phones, 104px on
+    // larger screens. Cropped to that exact shape by Cloudinary (c_fill), so
+    // the browser downloads only the pixels it shows — at most a 312×390
+    // image on a 3× screen, rather than a full-height original.
+    orderThumb: {
+        baseWidth: 208,
+        widths: [104, 176, 208, 264, 312],
+        sizes: "(max-width: 640px) 88px, 104px",
+        quality: "auto",
+        crop: "fill",
+        aspect: 1.25,
+    },
 };
 
 /**
@@ -152,7 +192,11 @@ export const IMAGE_PRESETS = {
  */
 export function imageAttrs(url, presetName = "card", { sizes } = {}) {
     const preset = IMAGE_PRESETS[presetName] || IMAGE_PRESETS.card;
-    const opts = { quality: preset.quality };
+    const opts = {
+        quality: preset.quality,
+        ...(preset.crop ? { crop: preset.crop } : {}),
+        ...(preset.aspect ? { aspect: preset.aspect } : {}),
+    };
     return {
         src: cloudinaryUrl(url, { ...opts, width: preset.baseWidth }),
         srcSet: cloudinarySrcSet(url, preset.widths, opts),

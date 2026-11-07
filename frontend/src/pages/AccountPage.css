@@ -345,128 +345,208 @@
     opacity: 0.88;
 }
 
-/* ===================== ORDER LIST ===================== */
+/* ===================== ORDER LIST =====================
+   One card per order, modelled on how Myntra and Amazon list orders:
+   status and date in a header strip, then the product (large image, name as
+   the title, size/colour/qty, total), then the order id and the action.
+   Everything else lives on the order details page. */
 .account-orders-list {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.1rem;
 }
 
 .account-order-card {
     background: #fff;
     border: 1.5px solid #e5e7eb;
-    border-radius: 0.75rem;
-    padding: 1.25rem 1.5rem;
+    border-radius: 0.9rem;
+    overflow: hidden;
     transition: border-color 0.2s, box-shadow 0.2s;
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
 }
 
-.account-order-card:hover {
-    border-color: #EFBF04;
-    box-shadow: 0 3px 14px rgba(239, 191, 4, 0.12);
+@media (hover: hover) {
+    .account-order-card:hover {
+        border-color: #EFBF04;
+        box-shadow: 0 3px 14px rgba(239, 191, 4, 0.12);
+    }
 }
 
-/* 3-column row */
-.account-order-row {
+.account-order-label {
+    color: #6b7280;
+    font-weight: 500;
+}
+
+/* Header strip: status + date */
+.account-order-head {
     display: flex;
     align-items: center;
-    gap: 1.25rem;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    padding: 0.85rem 1.5rem;
+    background: #fafafa;
+    border-bottom: 1px solid #f3f4f6;
 }
 
-/* Thumbnail */
-.account-order-thumb-wrap {
-    flex-shrink: 0;
-    text-align: center;
-}
-
-.account-order-thumb {
-    width: 60px;
-    height: 60px;
-    border-radius: 0.6rem;
-    overflow: hidden;
-    border: 1px solid #f3f4f6;
-    background: #f9fafb;
+.account-order-status {
     display: flex;
     align-items: center;
-    justify-content: center;
-}
-
-.account-order-thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.account-order-thumb-placeholder {
-    font-size: 1.5rem;
-}
-
-.account-order-more {
-    font-size: 0.7rem;
-    color: #9ca3af;
-    margin: 0.25rem 0 0;
-}
-
-/* Info column */
-.account-order-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.account-order-id {
-    font-size: 0.92rem;
-    font-weight: 700;
-    color: #111827;
-    margin: 0 0 0.15rem;
-}
-
-.account-order-date {
-    font-size: 0.8rem;
-    color: #9ca3af;
-    margin: 0 0 0.4rem;
-}
-
-.account-order-total {
-    font-size: 1rem;
-    font-weight: 700;
-    color: #111827;
-    margin: 0;
-}
-
-/* Actions column */
-.account-order-actions {
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
     gap: 0.6rem;
+    min-width: 0;
 }
 
 .account-order-badge {
     padding: 0.25rem 0.75rem;
     border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 700;
     letter-spacing: 0.02em;
     white-space: nowrap;
 }
 
-.account-order-view-btn {
-    padding: 0.4rem 1.1rem;
-    border: 1.5px solid #EFBF04;
-    border-radius: 0.4rem;
-    background: transparent;
-    color: #EFBF04;
-    font-size: 0.8rem;
+.account-order-status-note {
+    font-size: 0.85rem;
     font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-    transition: all 0.15s;
+    color: #374151;
 }
 
-.account-order-view-btn:hover {
-    background: #EFBF04;
-    color: #fff;
+.account-order-date {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #111827;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Body: image + product */
+.account-order-body {
+    display: flex;
+    gap: 1.25rem;
+    padding: 1.25rem 1.5rem 0.5rem;
+    align-items: flex-start;
+}
+
+.account-order-thumb {
+    flex-shrink: 0;
+    display: block;
+    width: 104px;
+    aspect-ratio: 4 / 5;
+    border-radius: 0.6rem;
+    overflow: hidden;
+    border: 1px solid #f3f4f6;
+    background: #f3f4f6;
+}
+
+.account-order-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.account-order-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.account-order-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: #111827;
+    /* Long names wrap to two lines, then ellipsize. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.account-order-title a {
+    color: inherit;
+    text-decoration: none;
+}
+
+@media (hover: hover) {
+    .account-order-title a:hover {
+        color: #b45309;
+    }
+}
+
+.account-order-variant {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.account-order-more {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #b45309;
+}
+
+.account-order-total {
+    margin: 0.35rem 0 0;
+    font-size: 0.92rem;
+    color: #111827;
+}
+
+.account-order-total strong {
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+/* Footer: order id + action */
+.account-order-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 1.5rem 1.15rem;
+}
+
+.account-order-id {
+    margin: 0;
+    min-width: 0;
+    font-size: 0.78rem;
+    color: #9ca3af;
+    overflow-wrap: anywhere;
+}
+
+.account-order-id .account-order-label {
+    color: #9ca3af;
+}
+
+.account-order-view-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 2.5rem;
+    padding: 0.45rem 0.9rem 0.45rem 1.15rem;
+    border: 1.5px solid #EFBF04;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: #b45309;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s;
+    touch-action: manipulation;
+}
+
+@media (hover: hover) {
+    .account-order-view-btn:hover {
+        background: #EFBF04;
+        color: #fff;
+    }
 }
 
 /* ===================== RESPONSIVE ===================== */
@@ -535,23 +615,31 @@
         font-size: 16px;
     }
 
-    /* Order cards: let the status + action drop to their own full-width row
-       below the thumbnail/info so the order id and date stop wrapping in a
-       cramped 3-column strip. */
-    .account-order-card {
-        padding: 1rem 1.1rem;
+    /* Order cards: tighter padding and a smaller (88px) image on phones; the
+       order id and the View details button stack so the button is full width
+       and easy to tap. */
+    .account-order-head {
+        padding: 0.75rem 1rem;
     }
 
-    .account-order-row {
-        flex-wrap: wrap;
-        gap: 0.85rem 1rem;
+    .account-order-body {
+        gap: 0.9rem;
+        padding: 1rem 1rem 0.35rem;
     }
 
-    .account-order-actions {
-        flex-basis: 100%;
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
+    .account-order-thumb {
+        width: 88px;
+    }
+
+    .account-order-title {
+        font-size: 0.98rem;
+    }
+
+    .account-order-foot {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.6rem;
+        padding: 0.6rem 1rem 1rem;
     }
 
     .account-order-view-btn {

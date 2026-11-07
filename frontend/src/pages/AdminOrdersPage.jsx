@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import formatPrice from '../utils/formatPrice';
 import CloudinaryImage from '../components/CloudinaryImage.jsx';
 
@@ -19,6 +20,7 @@ const AdminOrdersPage = () => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
+    const { logout } = useAuth();
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -37,9 +39,11 @@ const AdminOrdersPage = () => {
             .finally(() => setLoading(false));
     }, [navigate]);
 
+    /* The shared logout: clears storage AND the app's signed-in state (the
+       previous local version left the app thinking the admin was still signed
+       in until a reload), and confirms with a toast. */
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        logout();
         navigate('/');
     };
 
@@ -166,7 +170,28 @@ const AdminOrdersPage = () => {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td style={tdStyle}>{order.user?.name || '—'}</td>
+                                            <td style={tdStyle}>
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                                    {order.user?.name || order.shippingAddress?.fullName || '—'}
+                                                    {order.isGuest && (
+                                                        <span
+                                                            title={order.user ? 'Placed as a guest, later added to this account' : 'Placed without an account'}
+                                                            style={{
+                                                                padding: '0.1rem 0.5rem', borderRadius: '999px',
+                                                                fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.03em',
+                                                                backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb',
+                                                            }}
+                                                        >
+                                                            GUEST
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                {(order.contactEmail || order.user?.email) && (
+                                                    <span style={{ display: 'block', fontSize: '0.75rem', color: '#9ca3af', overflowWrap: 'anywhere' }}>
+                                                        {order.contactEmail || order.user?.email}
+                                                    </span>
+                                                )}
+                                            </td>
                                             <td style={tdStyle}>{formatPrice(order.totalAmount)}</td>
                                             <td style={tdStyle}>
                                                 <span style={{

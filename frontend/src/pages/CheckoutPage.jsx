@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Lock, Loader2 } from 'lucide-react';
+import { ChevronLeft, Lock, Loader2, UserRound } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useCart } from '../context/CartContext';
@@ -10,28 +10,80 @@ import './CheckoutPage.css';
 import CloudinaryImage from '../components/CloudinaryImage.jsx';
 import PromoCodeInput from '../components/PromoCodeInput.jsx';
 import { promoErrorMessage } from '../utils/promoErrors';
+import { useSiteConfig } from '../utils/siteConfig';
+import {
+    saveGuestCheckout,
+    saveCheckoutSource,
+    newCheckoutAttemptId,
+    checkField,
+    SERVER_FIELD_TO_FORM,
+} from '../utils/guestCheckout';
 
 const FALLBACK_SHIPPING = 8;
 const API = import.meta.env.VITE_API_URL;
 
-const REQUIRED_FIELDS = [
-    { key: 'fullName', label: 'Full Name' },
-    { key: 'contactNumber', label: 'Contact Number' },
-    { key: 'street', label: 'Address Line 1' },
-    { key: 'city', label: 'City' },
-    { key: 'state', label: 'State' },
-    { key: 'zip', label: 'ZIP Code' },
-];
+/** Field order for validation focus and the keyboard's "next" key. */
+const FIELD_ORDER = ['email', 'fullName', 'contactNumber', 'street', 'apartment', 'city', 'state', 'zip'];
+
+const MOBILE_QUERY = '(max-width: 768px)';
+const isMobileViewport = () => window.matchMedia?.(MOBILE_QUERY).matches ?? false;
+
+/** Phone layout? Tracks rotation/resizes, so exactly one Pay button is ever rendered. */
+const useIsMobile = () => {
+    const [mobile, setMobile] = useState(isMobileViewport);
+    useEffect(() => {
+        const mq = window.matchMedia?.(MOBILE_QUERY);
+        if (!mq) return undefined;
+        const onChange = () => setMobile(mq.matches);
+        mq.addEventListener('change', onChange);
+        return () => mq.removeEventListener('change', onChange);
+    }, []);
+    return mobile;
+};
+
+/* ─── Label helper ─── */
+const Label = ({ htmlFor, children, required }) => (
+    <label
+        htmlFor={htmlFor}
+        style={{
+            display: 'block',
+            fontSize: '0.82rem',
+            fontWeight: 600,
+            color: '#374151',
+            marginBottom: '0.4rem',
+            letterSpacing: '0.02em',
+        }}
+    >
+        {children}
+        {required && <span style={{ color: '#ef4444', marginLeft: '0.2rem' }}>*</span>}
+    </label>
+);
+
+const sectionHeadingStyle = {
+    fontSize: '1.15rem',
+    fontWeight: 700,
+    color: '#111827',
+    marginBottom: '1.25rem',
+    paddingBottom: '0.6rem',
+    borderBottom: '1px solid #e5e7eb',
+};
 
 const CheckoutPage = () => {
     const navigate = useNavigate();
-    const { cartItems, getSubtotal, clearCart, buyNowItem, clearBuyNowItem, appliedPromo } = useCart();
+    const { cartItems, getSubtotal, buyNowItem, clearBuyNowItem, appliedPromo } = useCart();
     const { user } = useAuth();
     const [placing, setPlacing] = useState(false);
     const [errors, setErrors] = useState({});
     /* Set when create-checkout rejects the promo at the last moment — the cart
        can drift between Apply and Pay, and the server has the final word. */
     const [promoError, setPromoError] = useState('');
+    /* Any other reason the server refused to start checkout, shown inline next
+       to the Pay button rather than in a blocking alert(). */
+    const [formError, setFormError] = useState('');
+    /* Mobile: hide the sticky Pay bar while a field is focused (keyboard open)
+       so it never covers the input being typed into. */
+    const [fieldFocused, setFieldFocused] = useState(false);
+    const isMobile = useIsMobile();
 
     /* ── Shipping rate state ── */
     const [shippingCost, setShippingCost] = useState(null);
@@ -41,7 +93,17 @@ const CheckoutPage = () => {
 
     /* ── Determine checkout mode ── */
     const isBuyNow = !!buyNowItem;
-    const checkoutItems = isBuyNow ? [buyNowItem] : cartItems;
+    const checkoutItems = useMemo(
+        () => (isBuyNow ? [buyNowItem] : cartItems),
+        [isBuyNow, buyNowItem, cartItems]
+    );
+
+    /* Signed out: guest checkout when it's enabled, otherwise Pay sends the
+       customer to sign in, as before. */
+    const isGuest = !user;
+    /* The backend's GUEST_CHECKOUT_ENABLED (the single switch, on Render).
+       null while it loads; false if it's off or unreachable. */
+    const guestCheckoutEnabled = useSiteConfig()?.guestCheckoutEnabled ?? null;
 
     /* Admin accounts cannot place orders. This disables the button and explains
        why — nothing more. The enforcement is blockAdminOrders on the
@@ -69,8 +131,20 @@ const CheckoutPage = () => {
     /* ── Abort controller ref to cancel in-flight requests ── */
     const abortRef = useRef(null);
     const autofilled = useRef(false);
+    /** The address the current shipping rate was fetched for. */
+    const shippingKeyRef = useRef('');
+    /** Synchronous double-submit guard — state updates are too slow for a double tap. */
+    const placingRef = useRef(false);
+    /**
+     * Idempotency key for create-checkout. Kept while the order being placed is
+     * unchanged, so a retry, a double tap or a return from Square reuses the
+     * same payment link; replaced as soon as anything about the order changes.
+     */
+    const attemptRef = useRef({ key: null, id: null });
+    const focusTimerRef = useRef(null);
 
-    const [form, setForm] = useState({
+    const [form, setForm] = useState(() => ({
+        email: user?.email || '',
         fullName: '',
         contactNumber: '',
         street: '',
@@ -79,7 +153,7 @@ const CheckoutPage = () => {
         state: '',
         zip: '',
         country: 'United States',
-    });
+    }));
 
     /* ── Autofill from saved address ── */
     useEffect(() => {
@@ -96,6 +170,7 @@ const CheckoutPage = () => {
                 const addr = data.user.address;
                 // Only autofill if the form hasn't been manually edited
                 setForm((prev) => ({
+                    email: prev.email || data.user.email || '',
                     fullName: prev.fullName || addr.fullName || '',
                     contactNumber: prev.contactNumber || addr.phone || '',
                     street: prev.street || addr.addressLine1 || '',
@@ -113,20 +188,38 @@ const CheckoutPage = () => {
             });
     }, [user]);
 
+    useEffect(() => () => clearTimeout(focusTimerRef.current), []);
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setForm((prev) => ({ ...prev, [name]: value }));
         if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
+        if (formError) setFormError('');
+    };
+
+    /* Inline validation once the customer leaves a field they've typed in. */
+    const handleBlur = (e) => {
+        const { name, value } = e.target;
+        if (!value.trim() && !errors[name]) return;
+        const message = checkField(name, value);
+        setErrors((prev) => ({ ...prev, [name]: message }));
     };
 
     /* ── Fetch live shipping rate from Shippo ── */
-    const fetchShippingRate = useCallback(async (formData) => {
+    const fetchShippingRate = useCallback(async (formData, { force = false } = {}) => {
         const { street, city, state, zip, fullName, contactNumber } = formData;
 
         /* Only call when all address fields are populated and ZIP is at least 5 chars */
         if (!street?.trim() || !city?.trim() || !state?.trim() || !zip?.trim() || zip.trim().length < 5) {
             return;
         }
+
+        const key = JSON.stringify([
+            street.trim(), city.trim(), state.trim(), zip.trim(),
+            checkoutItems.map((ci) => [ci.productId, ci.quantity]),
+        ]);
+        if (!force && key === shippingKeyRef.current) return;
+        shippingKeyRef.current = key;
 
         /* Cancel any previous in-flight request */
         if (abortRef.current) abortRef.current.abort();
@@ -170,106 +263,219 @@ const CheckoutPage = () => {
                 setShippingService('Flat Rate');
             }
         } finally {
-            setShippingLoading(false);
-            setShippingFetched(true);
+            if (abortRef.current === controller) {
+                setShippingLoading(false);
+                setShippingFetched(true);
+            }
         }
     }, [checkoutItems]);
 
+    /* Calculate shipping as soon as the address is complete — including when it
+       was filled by the browser's autofill or from the saved address, which
+       never blur the ZIP field. Debounced so typing doesn't fire a request per
+       keystroke. */
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchShippingRate({
+                street: form.street,
+                city: form.city,
+                state: form.state,
+                zip: form.zip,
+                fullName: form.fullName,
+                contactNumber: form.contactNumber,
+            });
+        }, 700);
+        return () => clearTimeout(timer);
+    }, [form.street, form.city, form.state, form.zip, form.fullName, form.contactNumber, fetchShippingRate]);
+
     /* ── Trigger shipping rate fetch on ZIP blur ── */
-    const handleZipBlur = () => {
+    const handleZipBlur = (e) => {
+        handleBlur(e);
         fetchShippingRate(form);
+    };
+
+    const focusField = (name) => {
+        const el = document.getElementById(name);
+        if (!el) return;
+        el.focus({ preventScroll: true });
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    };
+
+    /* Enter on a phone keyboard moves to the next field instead of submitting
+       half a form; on the last address field it just closes the keyboard. */
+    const handleKeyDown = (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const idx = FIELD_ORDER.indexOf(e.target.name);
+        const next = FIELD_ORDER[idx + 1];
+        if (next) focusField(next);
+        else e.target.blur();
+    };
+
+    /* Mobile: keep the focused field visible above the on-screen keyboard. The
+       keyboard animates in after focus, so scroll once it has settled. */
+    const handleFormFocus = (e) => {
+        if (!e.target.matches?.('input, select, textarea')) return;
+        setFieldFocused(true);
+        if (!isMobileViewport()) return;
+        clearTimeout(focusTimerRef.current);
+        const el = e.target;
+        focusTimerRef.current = setTimeout(() => {
+            el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }, 320);
+    };
+
+    const handleFormBlur = () => {
+        /* Moving between fields blurs one and focuses the next; only treat it
+           as "keyboard closed" if nothing else took focus. */
+        setTimeout(() => {
+            const active = document.activeElement;
+            if (!active?.matches?.('input, select, textarea')) setFieldFocused(false);
+        }, 80);
     };
 
     const validate = () => {
         const errs = {};
-        for (const { key, label } of REQUIRED_FIELDS) {
-            if (!form[key]?.trim()) errs[key] = `${label} is required`;
+        for (const name of FIELD_ORDER) {
+            const message = checkField(name, form[name]);
+            if (message) errs[name] = message;
         }
         setErrors(errs);
-        return Object.keys(errs).length === 0;
+        const firstInvalid = FIELD_ORDER.find((name) => errs[name]);
+        if (firstInvalid) focusField(firstInvalid);
+        return !firstInvalid;
+    };
+
+    const buildPayload = () => ({
+        cartItems: checkoutItems.map((ci) => ({
+            productId: ci.productId,
+            size: ci.size || '',
+            color: ci.color || '',
+            quantity: ci.quantity,
+        })),
+        shippingAddress: {
+            fullName: form.fullName.trim(),
+            phone: form.contactNumber.trim(),
+            addressLine1: form.street.trim(),
+            addressLine2: form.apartment.trim(),
+            city: form.city.trim(),
+            state: form.state.trim(),
+            zipCode: form.zip.trim(),
+            country: form.country,
+        },
+        /* No money fields are sent. The rate is recalculated server-side from
+           the address and product weights, and only the promo *code* travels —
+           the server re-validates it and recomputes the discount from the cart
+           it resolves. */
+        promoCode: appliedPromo?.code,
+        checkoutSource: isBuyNow ? 'buyNow' : 'cart',
+        /* The guest's email identifies their checkout; an account customer's is
+           the order's contact email (pre-filled from the account). */
+        ...(isGuest ? { email: form.email.trim() } : { contactEmail: form.email.trim() }),
+    });
+
+    const submitCheckout = async (body) => {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API}/payments/${isGuest ? 'guest/create-checkout' : 'create-checkout'}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(!isGuest && token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify(body),
+        });
+        return res.json();
     };
 
     const handlePayNow = async (e) => {
         e.preventDefault();
+        if (placingRef.current) return;
 
-        if (!user) { navigate('/signin'); return; }
+        /* Only a definite "off" sends the customer to sign in. While the setting
+           is still loading, the request goes ahead and the server decides
+           (GUEST_CHECKOUT_DISABLED is handled below). */
+        if (isGuest && guestCheckoutEnabled === false) {
+            navigate('/signin', { state: { from: '/checkout' } });
+            return;
+        }
         if (isAdminAccount) return;
         if (!validate()) return;
 
         /* If shipping hasn't been calculated yet, fetch it first */
         if (!shippingKnown) {
-            fetchShippingRate(form);
+            fetchShippingRate(form, { force: true });
             return;
         }
 
+        placingRef.current = true;
         setPlacing(true);
         setPromoError('');
+        setFormError('');
+        let redirecting = false;
 
         try {
-            const token = localStorage.getItem('token');
+            const payload = buildPayload();
+            const key = JSON.stringify(payload);
+            if (attemptRef.current.key !== key) {
+                attemptRef.current = { key, id: newCheckoutAttemptId() };
+            }
 
-            const shippingAddress = {
-                fullName: form.fullName,
-                phone: form.contactNumber,
-                addressLine1: form.street,
-                addressLine2: form.apartment,
-                city: form.city,
-                state: form.state,
-                zipCode: form.zip,
-                country: form.country,
-            };
+            let data = await submitCheckout({ ...payload, checkoutAttemptId: attemptRef.current.id });
 
-            const res = await fetch(`${API}/payments/create-checkout`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    cartItems: checkoutItems.map((ci) => ({
-                        productId: ci.productId,
-                        image: ci.image || '',
-                        size: ci.size || '',
-                        color: ci.color || '',
-                        quantity: ci.quantity,
-                    })),
-                    shippingAddress,
-                    /* No money fields are sent. shippingCost used to be
-                       included here and silently ignored by the server, which
-                       invited someone to "helpfully" start trusting it; the
-                       rate is recalculated server-side from the address and
-                       product weights. Likewise only the promo *code* travels —
-                       the server re-validates it and recomputes the discount
-                       from the cart it resolves. */
-                    promoCode: appliedPromo?.code,
-                }),
-            });
-
-            const data = await res.json();
+            /* The server saw this attempt id with different details, or its
+               payment link has since been deactivated: start a fresh attempt. */
+            if (data.code === 'CHECKOUT_CHANGED' || data.code === 'CHECKOUT_EXPIRED') {
+                attemptRef.current = { key, id: newCheckoutAttemptId() };
+                data = await submitCheckout({ ...payload, checkoutAttemptId: attemptRef.current.id });
+            }
 
             if (data.success && data.checkoutUrl) {
-                if (data.squareOrderId) {
-                    sessionStorage.setItem('pehnawa_squareOrderId', data.squareOrderId);
+                const source = isBuyNow ? 'buyNow' : 'cart';
+                if (isGuest) {
+                    saveGuestCheckout({
+                        squareOrderId: data.squareOrderId,
+                        token: data.guestToken,
+                        source,
+                        email: form.email.trim(),
+                    });
+                } else {
+                    try {
+                        if (data.squareOrderId) sessionStorage.setItem('pehnawa_squareOrderId', data.squareOrderId);
+                    } catch {
+                        /* the confirmation page falls back to the latest checkout */
+                    }
+                    saveCheckoutSource(source);
                 }
+                redirecting = true;
                 window.location.href = data.checkoutUrl;
-            } else if (data.code === 'ADMIN_CANNOT_ORDER') {
-                /* Only reachable if the disabled button was bypassed, or if the
-                   account was promoted to admin after this page loaded. The
-                   server's message is the authoritative one. */
-                alert(data.message);
+                return;
+            }
+
+            if (data.code === 'GUEST_CHECKOUT_DISABLED') {
+                navigate('/signin', { state: { from: '/checkout' } });
             } else if (data.code?.startsWith('PROMO_')) {
                 /* The code stopped being valid between Apply and Pay. Show the
-                   specific reason inline instead of an opaque alert, and leave
-                   the order un-placed so the customer can drop the code. */
+                   specific reason inline, and leave the order un-placed so the
+                   customer can drop the code. */
                 setPromoError(promoErrorMessage(data, formatPrice));
+            } else if (data.code === 'VALIDATION_ERROR' && SERVER_FIELD_TO_FORM[data.field]) {
+                const field = SERVER_FIELD_TO_FORM[data.field];
+                setErrors((prev) => ({ ...prev, [field]: data.message }));
+                focusField(field);
             } else {
-                alert(data.message || 'Failed to create checkout session.');
+                /* ADMIN_CANNOT_ORDER (only reachable if the disabled button was
+                   bypassed), stock or availability changes, rate limiting… —
+                   the server's message is the authoritative one. */
+                setFormError(data.message || 'We couldn’t start checkout. Please try again.');
             }
         } catch (err) {
             console.error('Checkout error:', err);
-            alert('Something went wrong. Please try again.');
+            setFormError('Something went wrong. Please check your connection and try again.');
         } finally {
-            setPlacing(false);
+            if (!redirecting) {
+                placingRef.current = false;
+                setPlacing(false);
+            }
         }
     };
 
@@ -294,6 +500,7 @@ const CheckoutPage = () => {
                     </p>
                     <button
                         onClick={() => navigate('/')}
+                        className="min-h-11"
                         style={{
                             padding: '0.75rem 2rem',
                             fontSize: '0.9rem',
@@ -318,23 +525,26 @@ const CheckoutPage = () => {
         );
     }
 
-    /* ─── Label helper ─── */
-    const Label = ({ htmlFor, children, required }) => (
-        <label
-            htmlFor={htmlFor}
-            style={{
-                display: 'block',
-                fontSize: '0.82rem',
-                fontWeight: 600,
-                color: '#374151',
-                marginBottom: '0.4rem',
-                letterSpacing: '0.02em',
-            }}
-        >
-            {children}
-            {required && <span style={{ color: '#ef4444', marginLeft: '0.2rem' }}>*</span>}
-        </label>
-    );
+    /** Props shared by every text field: value, validation wiring, a11y. */
+    const fieldProps = (name) => ({
+        id: name,
+        name,
+        value: form[name],
+        onChange: handleChange,
+        onBlur: name === 'zip' ? handleZipBlur : handleBlur,
+        onKeyDown: handleKeyDown,
+        className: `checkout-input${errors[name] ? ' input-error' : ''}`,
+        'aria-invalid': errors[name] ? 'true' : undefined,
+        'aria-describedby': errors[name] ? `${name}-error` : undefined,
+        enterKeyHint: name === 'zip' ? 'done' : 'next',
+    });
+
+    const fieldError = (name) =>
+        errors[name] ? <span id={`${name}-error`} className="field-error" role="alert">{errors[name]}</span> : null;
+
+    const payDisabled = placing || shippingLoading || !shippingKnown || isAdminAccount;
+    const payLabel = placing ? 'Placing Order…' : 'Pay Now';
+    const totalLabel = shippingLoading ? 'Calculating…' : shippingKnown ? formatPrice(total) : '—';
 
     return (
         <div className="checkout-page">
@@ -388,135 +598,143 @@ const CheckoutPage = () => {
             </div>
 
             {/* ═══════ Main two-column layout ═══════ */}
-            <form onSubmit={handlePayNow} className="checkout-container">
+            <form
+                id="checkout-form"
+                onSubmit={handlePayNow}
+                onFocus={handleFormFocus}
+                onBlur={handleFormBlur}
+                className="checkout-container"
+                noValidate
+            >
                 {/* ──── LEFT PANEL – Customer Details ──── */}
                 <div className="checkout-left">
+                    {/* Signed-out banner */}
+                    {isGuest && guestCheckoutEnabled !== null && (
+                        <div className="checkout-guest-banner">
+                            <UserRound size={18} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0, color: '#b45309' }} />
+                            <p style={{ margin: 0 }}>
+                                {guestCheckoutEnabled
+                                    ? <>Checking out as a <strong>guest</strong> — no account needed.</>
+                                    : <>You&apos;ll be asked to sign in to place your order.</>}
+                                {' '}
+                                <button
+                                    type="button"
+                                    className="checkout-link-btn"
+                                    onClick={() => navigate('/signin', { state: { from: '/checkout' } })}
+                                >
+                                    {guestCheckoutEnabled ? 'Have an account? Sign in' : 'Sign in'}
+                                </button>
+                            </p>
+                        </div>
+                    )}
+
                     {/* Contact Section */}
-                    <h2
-                        style={{
-                            fontSize: '1.15rem',
-                            fontWeight: 700,
-                            color: '#111827',
-                            marginBottom: '1.25rem',
-                            paddingBottom: '0.6rem',
-                            borderBottom: '1px solid #e5e7eb',
-                        }}
-                    >
-                        Contact Information
-                    </h2>
+                    <h2 style={sectionHeadingStyle}>Contact Information</h2>
+
+                    <div style={{ marginBottom: '1.1rem' }}>
+                        <Label htmlFor="email" required>Email</Label>
+                        <input
+                            {...fieldProps('email')}
+                            type="email"
+                            inputMode="email"
+                            autoComplete="email"
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            spellCheck="false"
+                            placeholder="you@example.com"
+                        />
+                        {fieldError('email') || (
+                            <span className="field-hint">
+                                {isGuest
+                                    ? 'We use this to contact you about your order.'
+                                    : 'Pre-filled from your account. Changing it here only affects this order.'}
+                            </span>
+                        )}
+                    </div>
 
                     <div style={{ marginBottom: '1.1rem' }}>
                         <Label htmlFor="fullName" required>Full Name</Label>
                         <input
-                            id="fullName"
-                            name="fullName"
+                            {...fieldProps('fullName')}
                             type="text"
-                            className={`checkout-input${errors.fullName ? ' input-error' : ''}`}
+                            autoComplete="name"
+                            autoCapitalize="words"
                             placeholder="John Doe"
-                            value={form.fullName}
-                            onChange={handleChange}
                         />
-                        {errors.fullName && <span className="field-error">{errors.fullName}</span>}
+                        {fieldError('fullName')}
                     </div>
 
                     <div style={{ marginBottom: '2rem' }}>
                         <Label htmlFor="contactNumber" required>Contact Number</Label>
                         <input
-                            id="contactNumber"
-                            name="contactNumber"
+                            {...fieldProps('contactNumber')}
                             type="tel"
-                            className={`checkout-input${errors.contactNumber ? ' input-error' : ''}`}
+                            inputMode="tel"
+                            autoComplete="tel"
                             placeholder="+1 (555) 000-0000"
-                            value={form.contactNumber}
-                            onChange={handleChange}
                         />
-                        {errors.contactNumber && <span className="field-error">{errors.contactNumber}</span>}
+                        {fieldError('contactNumber')}
                     </div>
 
                     {/* Address Section */}
-                    <h2
-                        style={{
-                            fontSize: '1.15rem',
-                            fontWeight: 700,
-                            color: '#111827',
-                            marginBottom: '1.25rem',
-                            paddingBottom: '0.6rem',
-                            borderBottom: '1px solid #e5e7eb',
-                        }}
-                    >
-                        Shipping Address
-                    </h2>
+                    <h2 style={sectionHeadingStyle}>Shipping Address</h2>
 
                     <div style={{ marginBottom: '1.1rem' }}>
                         <Label htmlFor="street" required>Street Address</Label>
                         <input
-                            id="street"
-                            name="street"
+                            {...fieldProps('street')}
                             type="text"
-                            className={`checkout-input${errors.street ? ' input-error' : ''}`}
+                            autoComplete="address-line1"
                             placeholder="123 Main Street"
-                            value={form.street}
-                            onChange={handleChange}
                         />
-                        {errors.street && <span className="field-error">{errors.street}</span>}
+                        {fieldError('street')}
                     </div>
 
                     <div style={{ marginBottom: '1.1rem' }}>
                         <Label htmlFor="apartment">Apartment / Suite</Label>
                         <input
-                            id="apartment"
-                            name="apartment"
+                            {...fieldProps('apartment')}
                             type="text"
-                            className="checkout-input"
+                            autoComplete="address-line2"
                             placeholder="Apt 4B (optional)"
-                            value={form.apartment}
-                            onChange={handleChange}
                         />
+                        {fieldError('apartment')}
                     </div>
 
                     <div className="checkout-row" style={{ marginBottom: '1.1rem' }}>
                         <div>
                             <Label htmlFor="city" required>City</Label>
                             <input
-                                id="city"
-                                name="city"
+                                {...fieldProps('city')}
                                 type="text"
-                                className={`checkout-input${errors.city ? ' input-error' : ''}`}
+                                autoComplete="address-level2"
                                 placeholder="New York"
-                                value={form.city}
-                                onChange={handleChange}
                             />
-                            {errors.city && <span className="field-error">{errors.city}</span>}
+                            {fieldError('city')}
                         </div>
                         <div>
-                            <Label htmlFor="state" required>State</Label>
+                            <Label htmlFor="state" required>State / Province</Label>
                             <input
-                                id="state"
-                                name="state"
+                                {...fieldProps('state')}
                                 type="text"
-                                className={`checkout-input${errors.state ? ' input-error' : ''}`}
+                                autoComplete="address-level1"
                                 placeholder="NY"
-                                value={form.state}
-                                onChange={handleChange}
                             />
-                            {errors.state && <span className="field-error">{errors.state}</span>}
+                            {fieldError('state')}
                         </div>
                     </div>
 
                     <div className="checkout-row" style={{ marginBottom: '1.1rem' }}>
                         <div>
-                            <Label htmlFor="zip" required>ZIP Code</Label>
+                            <Label htmlFor="zip" required>ZIP / Postal Code</Label>
                             <input
-                                id="zip"
-                                name="zip"
+                                {...fieldProps('zip')}
                                 type="text"
-                                className={`checkout-input${errors.zip ? ' input-error' : ''}`}
+                                autoComplete="postal-code"
+                                autoCapitalize="characters"
                                 placeholder="10001"
-                                value={form.zip}
-                                onChange={handleChange}
-                                onBlur={handleZipBlur}
                             />
-                            {errors.zip && <span className="field-error">{errors.zip}</span>}
+                            {fieldError('zip')}
                         </div>
                         <div>
                             <Label htmlFor="country">Country</Label>
@@ -524,6 +742,7 @@ const CheckoutPage = () => {
                                 id="country"
                                 name="country"
                                 className="checkout-select"
+                                autoComplete="country-name"
                                 value={form.country}
                                 onChange={handleChange}
                             >
@@ -579,6 +798,7 @@ const CheckoutPage = () => {
                             borderRadius: '1rem',
                             padding: '1.75rem',
                         }}
+                        className="checkout-summary-card"
                     >
                         <h2
                             style={{
@@ -817,41 +1037,22 @@ const CheckoutPage = () => {
                             </span>
                         </div>
 
-                        {/* Pay Now Button */}
-                        {(() => {
-                            const payDisabled = placing || shippingLoading || !shippingKnown || isAdminAccount;
-                            return (
-                                <button
-                                    type="submit"
-                                    disabled={payDisabled}
-                                    aria-describedby={isAdminAccount ? 'admin-order-block' : undefined}
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.9rem',
-                                        fontSize: '0.95rem',
-                                        fontWeight: 700,
-                                        color: '#fff',
-                                        background: payDisabled ? '#d1d5db' : 'linear-gradient(135deg, #EFBF04, #d4a904)',
-                                        border: 'none',
-                                        borderRadius: '0.6rem',
-                                        cursor: payDisabled ? 'not-allowed' : 'pointer',
-                                        letterSpacing: '0.06em',
-                                        textTransform: 'uppercase',
-                                        fontFamily: 'inherit',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '0.5rem',
-                                        transition: 'all 0.2s',
-                                    }}
-                                    onMouseEnter={(e) => { if (!payDisabled) { e.currentTarget.style.opacity = '0.9'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(239, 191, 4, 0.4)'; } }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.boxShadow = 'none'; }}
-                                >
-                                    <Lock size={16} strokeWidth={2.5} />
-                                    {placing ? 'Placing Order…' : 'Pay Now'}
-                                </button>
-                            );
-                        })()}
+                        {formError && (
+                            <p role="alert" className="checkout-form-error">{formError}</p>
+                        )}
+
+                        {/* Pay Now Button — desktop/tablet. On phones the sticky bar below takes over. */}
+                        {!isMobile && (
+                            <button
+                                type="submit"
+                                disabled={payDisabled}
+                                aria-describedby={isAdminAccount ? 'admin-order-block' : undefined}
+                                className="checkout-pay-btn checkout-summary-pay"
+                            >
+                                {placing ? <Loader2 size={16} className="shipping-spinner" /> : <Lock size={16} strokeWidth={2.5} />}
+                                {payLabel}
+                            </button>
+                        )}
 
                         {isAdminAccount ? (
                             <p
@@ -884,6 +1085,33 @@ const CheckoutPage = () => {
                     </div>
                 </div>
             </form>
+
+            {/* ── Mobile sticky Pay bar ──
+                Always reachable without scrolling past the order summary.
+                Hidden while a field has focus, i.e. while the on-screen
+                keyboard is up, so it never covers what is being typed. */}
+            {isMobile && (
+                <div
+                    className={`checkout-mobile-cta${fieldFocused ? ' is-hidden' : ''}`}
+                    aria-hidden={fieldFocused ? 'true' : undefined}
+                >
+                    <div className="checkout-mobile-cta-total">
+                        <span>Total</span>
+                        <strong>{totalLabel}</strong>
+                    </div>
+                    <button
+                        type="submit"
+                        form="checkout-form"
+                        disabled={payDisabled}
+                        tabIndex={fieldFocused ? -1 : undefined}
+                        aria-describedby={isAdminAccount ? 'admin-order-block' : undefined}
+                        className="checkout-pay-btn"
+                    >
+                        {placing ? <Loader2 size={16} className="shipping-spinner" /> : <Lock size={16} strokeWidth={2.5} />}
+                        {!isAdminAccount && !shippingKnown && !shippingLoading ? 'Enter address' : payLabel}
+                    </button>
+                </div>
+            )}
 
             <Footer />
         </div>

@@ -18,7 +18,6 @@ export const getWishlist = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Failed to fetch wishlist.",
-            error: error.message,
         });
     }
 };
@@ -61,7 +60,6 @@ export const addToWishlist = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Failed to add to wishlist.",
-            error: error.message,
         });
     }
 };
@@ -95,7 +93,6 @@ export const removeFromWishlist = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Failed to remove from wishlist.",
-            error: error.message,
         });
     }
 };

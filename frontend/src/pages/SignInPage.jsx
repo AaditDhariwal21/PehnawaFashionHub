@@ -1,99 +1,74 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../utils/toast';
+
+/** Only same-site paths may be used as a post-login redirect. */
+const safeRedirectPath = (value) =>
+    typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : null;
 
 const SignInPage = () => {
-    const [isSignUp, setIsSignUp] = useState(false);
+    const location = useLocation();
+    /* Optional router state (never the URL, so nothing sensitive is logged or
+       shared): `from` to return to after sign-in, `mode`/`email` to open the
+       sign-up form pre-filled, and `claimToken` to attach a guest order to the
+       account once signed in (see /api/orders/guest/claim). */
+    const authState = location.state || {};
+    const [isSignUp, setIsSignUp] = useState(authState.mode === 'signup');
     const [fullName, setFullName] = useState('');
-    const [email, setEmail] = useState('');
+    const [email, setEmail] = useState(typeof authState.email === 'string' ? authState.email : '');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const navigate = useNavigate();
     const { login } = useAuth();
+    const toast = useToast();
 
     const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-    // Handle Google credential response (ID token flow)
-    const handleGoogleResponse = useCallback(async (response) => {
-        setError('');
-        setIsGoogleLoading(true);
+    /**
+     * Where to go once signed in. Admins always go to the dashboard, as before.
+     * A guest who came here to keep their order gets it attached first; if
+     * that fails (e.g. a different email), they are taken back to the order.
+     */
+    const finishAuth = async (data) => {
+        const firstName = String(data.user?.name || '').trim().split(/\s+/)[0];
+        toast.success(isSignUp
+            ? 'Account created. Welcome to Pehnawa!'
+            : `Welcome back${firstName ? `, ${firstName}` : ''}!`);
 
-        try {
-            const res = await fetch(`${API_BASE_URL}/auth/google`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ credential: response.credential }),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                setError(data.message || 'Google sign-in failed');
-                setIsGoogleLoading(false);
-                return;
-            }
-
-            // Store user info (JWT is in httpOnly cookie)
-            login(data.user);
-
-            // Redirect based on role
-            if (data.user.role === 'admin') {
-                navigate('/adminDashboard');
-            } else {
-                navigate('/');
-            }
-        } catch (err) {
-            console.error('Google auth error:', err);
-            setError('Network error during Google sign-in. Please try again.');
-        } finally {
-            setIsGoogleLoading(false);
+        if (data.user.role === 'admin') {
+            navigate('/adminDashboard');
+            return;
         }
-    }, [login, navigate]);
 
-    // Initialize Google Identity Services
-    useEffect(() => {
-        const initializeGoogle = () => {
-            if (window.google?.accounts?.id) {
-                window.google.accounts.id.initialize({
-                    client_id: '80575999079-4ot9ns9rv0i5l0oa3cep9a8lu9db0is8.apps.googleusercontent.com',
-                    callback: handleGoogleResponse,
+        if (typeof authState.claimToken === 'string' && data.token) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/orders/guest/claim`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${data.token}`,
+                    },
+                    body: JSON.stringify({ token: authState.claimToken }),
                 });
+                const claim = await res.json();
+                if (claim.success && claim.order?._id) {
+                    toast.success('Your order has been added to your account');
+                    navigate(`/account/orders/${claim.order._id}`);
+                    return;
+                }
+            } catch (err) {
+                console.error('Order claim error:', err);
             }
-        };
-
-        // Google script may already be loaded by @react-oauth/google
-        if (window.google?.accounts?.id) {
-            initializeGoogle();
-        } else {
-            // Wait for the script to load
-            const interval = setInterval(() => {
-                if (window.google?.accounts?.id) {
-                    initializeGoogle();
-                    clearInterval(interval);
-                }
-            }, 100);
-            return () => clearInterval(interval);
+            navigate(`/order-details#t=${authState.claimToken}`);
+            return;
         }
-    }, [handleGoogleResponse]);
 
-    // Trigger Google Sign-In programmatically from custom button
-    const handleGoogleLogin = () => {
-        if (window.google?.accounts?.id) {
-            window.google.accounts.id.prompt((notification) => {
-                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                    // Fallback: If One Tap is blocked/skipped, use the popup flow
-                    setError('Google sign-in popup was blocked. Please allow popups and try again.');
-                }
-            });
-        } else {
-            setError('Google Sign-In is not available. Please refresh the page.');
-        }
+        navigate(safeRedirectPath(authState.from) || '/');
     };
 
     const handleSubmit = async (e) => {
@@ -132,12 +107,7 @@ const SignInPage = () => {
                 // Store token and user info
                 login(data.user, data.token);
 
-                // Redirect based on role
-                if (data.user.role === 'admin') {
-                    navigate('/adminDashboard');
-                } else {
-                    navigate('/');
-                }
+                await finishAuth(data);
             } else {
                 // Sign In
                 if (!email || !password) {
@@ -163,12 +133,7 @@ const SignInPage = () => {
                 // Store token and user info
                 login(data.user, data.token);
 
-                // Redirect based on role
-                if (data.user.role === 'admin') {
-                    navigate('/adminDashboard');
-                } else {
-                    navigate('/');
-                }
+                await finishAuth(data);
             }
         } catch (err) {
             console.error('Auth error:', err);
@@ -186,7 +151,7 @@ const SignInPage = () => {
         <div className="w-full min-h-screen flex justify-center items-center px-4 py-8 md:p-0" style={{ backgroundColor: '#F5F5F5' }}>
             {/* Sign In/Up Box */}
             <div
-                className={`rounded-xl flex flex-col items-center justify-center w-full max-w-[30rem] px-6 py-8 md:px-[3.125rem] md:py-10 ${isSignUp ? 'md:h-[34rem]' : 'md:h-[32rem]'}`}
+                className={`rounded-xl flex flex-col items-center justify-center w-full max-w-[30rem] px-6 py-8 md:px-[3.125rem] md:py-10 ${isSignUp ? 'md:min-h-[34rem]' : 'md:min-h-[32rem]'}`}
                 style={{
                     backgroundColor: '#FFFFFF',
                     border: '0.0625rem solid #FAD76C',
@@ -206,19 +171,7 @@ const SignInPage = () => {
                         {isSignUp ? 'Welcome to Pehnawa!' : 'Sign in'}
                     </h1>
                     <p className="text-base text-gray-500">
-                        {isSignUp ? (
-                            "Let's create your account"
-                        ) : (
-                            <>
-                                Click here to{' '}
-                                <span
-                                    className="cursor-pointer hover:text-blue-600 transition-colors inline-block py-1"
-                                    onClick={() => { setIsSignUp(true); setError(''); }}
-                                >
-                                    create an account
-                                </span>
-                            </>
-                        )}
+                        {isSignUp ? "Let's create your account" : 'Welcome back to Pehnawa'}
                     </p>
                 </div>
 
@@ -326,40 +279,26 @@ const SignInPage = () => {
                         {isLoading ? 'Please wait...' : (isSignUp ? 'Sign Up' : 'Sign In')}
                     </button>
 
-                    {/* Sign In Link - Only for Sign Up */}
-                    {isSignUp && (
-                        <p className="text-sm text-gray-500 text-center mt-4">
-                            or click here to{' '}
-                            <span
-                                className="cursor-pointer hover:text-blue-600 transition-colors inline-block py-1"
-                                onClick={() => { setIsSignUp(false); setError(''); }}
-                            >
-                                sign into your account
-                            </span>
-                        </p>
-                    )}
+                    {/* "or" divider, then the link to switch between signing in and
+                        creating an account — below the main button, where a
+                        customer who doesn't have an account yet looks next. */}
+                    <div className="flex items-center w-full" style={{ marginTop: '1.5rem', marginBottom: '1rem' }} role="separator" aria-label="or">
+                        <div className="flex-1 border-t border-gray-200"></div>
+                        <span className="px-4 text-sm text-gray-400">or</span>
+                        <div className="flex-1 border-t border-gray-200"></div>
+                    </div>
+                    <p className="text-sm text-gray-500 text-center">
+                        Click here to{' '}
+                        <button
+                            type="button"
+                            className="cursor-pointer hover:text-blue-600 transition-colors inline-block py-1 bg-transparent border-none p-0 min-h-11 md:min-h-0"
+                            onClick={() => { setIsSignUp(!isSignUp); setError(''); }}
+                        >
+                            {isSignUp ? 'sign into your account' : 'create an account'}
+                        </button>
+                    </p>
                 </form>
 
-                {/* Or Divider + Sign in with Google - Only for Sign In */}
-                {!isSignUp && (
-                    <>
-                        {/* Or Divider */}
-                        <div className="flex items-center w-full" style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
-                            <div className="flex-1 border-t border-gray-200"></div>
-                            <span className="px-4 text-base text-gray-400">or</span>
-                            <div className="flex-1 border-t border-gray-200"></div>
-                        </div>
-
-                        <button
-                            onClick={handleGoogleLogin}
-                            disabled={isGoogleLoading}
-                            className={`w-full h-11 md:h-10 rounded-md text-gray-700 font-medium transition-all hover:opacity-90 cursor-pointer ${isGoogleLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-                            style={{ backgroundColor: '#ffcc00ff' }}
-                        >
-                            {isGoogleLoading ? 'Signing in...' : 'Sign in with Google'}
-                        </button>
-                    </>
-                )}
             </div>
         </div>
     );

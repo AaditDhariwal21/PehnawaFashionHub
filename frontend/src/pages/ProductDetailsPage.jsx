@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Heart, Ruler, ChevronDown } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useCart } from '../context/CartContext';
+import { useToast } from '../utils/toast';
 import { useWishlist } from '../context/WishlistContext';
 import { useCompare } from '../context/CompareContext';
 import formatPrice from '../utils/formatPrice';
@@ -29,6 +30,7 @@ const ProductDetailsPage = () => {
     const { id, categorySlug, productSlug } = useParams();
     const navigate = useNavigate();
     const { addToCart, openCart, setBuyNowItem } = useCart();
+    const toast = useToast();
     const { isWishlisted, toggleWishlist } = useWishlist();
     const { compareCount } = useCompare();
 
@@ -159,10 +161,10 @@ const ProductDetailsPage = () => {
     const isPurchasable = selectedVariant && selectedVariant.stock > 0;
 
     const handleBuyNow = () => {
-        if (!selectedColor) { alert('Please select a color.'); return; }
-        if (!selectedSize) { alert('Please select a size.'); return; }
-        if (!selectedVariant) { alert('That combination is not available.'); return; }
-        if (selectedVariant.stock === 0) { alert('That combination is out of stock.'); return; }
+        if (!selectedColor) { toast.error('Please select a color.'); return; }
+        if (!selectedSize) { toast.error('Please select a size.'); return; }
+        if (!selectedVariant) { toast.error('That combination is not available.'); return; }
+        if (selectedVariant.stock === 0) { toast.error('That combination is out of stock.'); return; }
         setBuyNowItem({
             productId: product._id,
             name: product.name,
@@ -176,10 +178,10 @@ const ProductDetailsPage = () => {
     };
 
     const handleAddToCart = () => {
-        if (!selectedColor) { alert('Please select a color.'); return; }
-        if (!selectedSize) { alert('Please select a size.'); return; }
+        if (!selectedColor) { toast.error('Please select a color.'); return; }
+        if (!selectedSize) { toast.error('Please select a size.'); return; }
         if (!selectedVariant || selectedVariant.stock === 0) {
-            alert('That combination is unavailable.');
+            toast.error('That combination is unavailable.');
             return;
         }
         addToCart({

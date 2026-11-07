@@ -6,6 +6,7 @@ import {
     normalizeCode,
     releaseStaleReservations,
 } from "../services/promoService.js";
+import { validateCartItems } from "../utils/checkoutValidation.js";
 
 /* ══════════════════════════════════════════════════════════════
    POST /api/promo/validate
@@ -15,18 +16,41 @@ import {
    usage slot. createCheckoutSession() re-validates from scratch
    before any money moves, because the cart can change in between.
    ══════════════════════════════════════════════════════════════ */
-export const validatePromoCode = async (req, res) => {
+export const validatePromoCode = (req, res) => runPromoValidation(req, res, { userId: req.user.id });
+
+/* ══════════════════════════════════════════════════════════════
+   POST /api/promo/guest/validate
+
+   The guest equivalent. Runs every code-level rule (exists, active,
+   dates, minimum, total limit, scope) but not the per-customer ones
+   (per-customer limit, first order only): those are keyed on the
+   checkout email, which the guest may not have typed yet, and are
+   enforced authoritatively at create-checkout. Deliberately takes
+   no email, so this endpoint can't be used to ask "has this email
+   used this code / ordered before?".
+   ══════════════════════════════════════════════════════════════ */
+export const validateGuestPromoCode = (req, res) => runPromoValidation(req, res, {});
+
+const runPromoValidation = async (req, res, customer) => {
     try {
         const { code, cartItems } = req.body || {};
 
-        const resolved = await resolveCartForPromo(cartItems);
+        if (typeof code !== "string" || code.length > 40) {
+            return res.status(400).json({ success: false, code: "PROMO_CODE_REQUIRED", message: "Please enter a promo code." });
+        }
+        const cart = validateCartItems(cartItems);
+        if (!cart.ok) {
+            return res.status(400).json({ success: false, message: cart.message });
+        }
+
+        const resolved = await resolveCartForPromo(cart.value);
         if (!resolved.ok) {
             return res.status(400).json({ success: false, message: resolved.message });
         }
 
         const result = await validatePromoForCart({
             code,
-            userId: req.user.id,
+            userId: customer.userId ?? null,
             lineItems: resolved.lineItems,
         });
 
@@ -61,7 +85,6 @@ export const validatePromoCode = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Server error validating promo code.",
-            error: error.message,
         });
     }
 };
@@ -121,7 +144,6 @@ export const getPromoCodes = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Server error fetching promo codes.",
-            error: error.message,
         });
     }
 };
@@ -164,7 +186,6 @@ export const createPromoCode = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Server error creating promo code.",
-            error: error.message,
         });
     }
 };
@@ -216,7 +237,6 @@ export const updatePromoCode = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Server error updating promo code.",
-            error: error.message,
         });
     }
 };
@@ -247,7 +267,6 @@ export const setPromoCodeActive = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Server error updating promo code.",
-            error: error.message,
         });
     }
 };
@@ -268,7 +287,6 @@ export const getPromoRedemptions = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Server error fetching redemptions.",
-            error: error.message,
         });
     }
 };

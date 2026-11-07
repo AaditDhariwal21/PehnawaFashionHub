@@ -1,17 +1,15 @@
 import express from "express";
-import { signup, login, updateProfile, googleLogin, logoutUser } from "../controllers/AuthController.js";
+import { signup, login, updateProfile, logoutUser } from "../controllers/AuthController.js";
 import { verifyToken } from "../middlewares/AuthMiddleware.js";
+import { authIpLimiter, loginAttemptLimiter } from "../middlewares/RateLimitMiddleware.js";
 
 const router = express.Router();
 
 // POST /api/auth/signup - Register a new user
-router.post("/signup", signup);
+router.post("/signup", authIpLimiter, signup);
 
 // POST /api/auth/login - Login existing user
-router.post("/login", login);
-
-// POST /api/auth/google - Google Sign-In with ID token
-router.post("/google", googleLogin);
+router.post("/login", authIpLimiter, loginAttemptLimiter, login);
 
 // POST /api/auth/logout - Clear httpOnly cookie
 router.post("/logout", logoutUser);

@@ -24,7 +24,6 @@ export const uploadImages = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Error uploading images",
-            error: error.message,
         });
     }
 };

@@ -210,6 +210,12 @@ const installStubs = async (context) => {
         if (url.includes('/promo')) {
             return json({ success: false, message: 'stubbed' });
         }
+        /* Signed-in carts are saved server-side: on sign-in the browser cart
+           is merged into it (POST /cart/merge) and every read returns the
+           saved cart. Answer with the seeded cart item, as the server would. */
+        if (url.includes('/api/cart')) {
+            return json({ success: true, items: [{ ...CART_ITEM, stock: 10 }] });
+        }
 
         /* Anything else that would have left the machine. Order-creating
            endpoints land here deliberately: if the checkout ever posted one,

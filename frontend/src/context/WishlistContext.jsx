@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { useToast } from '../utils/toast';
 
 const WishlistContext = createContext();
 
@@ -30,6 +31,7 @@ const getToken = () => localStorage.getItem('token');
 
 export const WishlistProvider = ({ children }) => {
     const { isLoggedIn } = useAuth();
+    const toast = useToast();
     const [items, setItems] = useState(readLocal);
     const [loading, setLoading] = useState(false);
 
@@ -143,11 +145,13 @@ export const WishlistProvider = ({ children }) => {
         (productId, color = '', size = '') => {
             if (items.some((item) => item.productId === productId)) {
                 removeFromWishlist(productId);
+                toast.info('Removed from your wishlist');
             } else {
                 addToWishlist(productId, color, size);
+                toast.success('Added to your wishlist');
             }
         },
-        [items, addToWishlist, removeFromWishlist]
+        [items, addToWishlist, removeFromWishlist, toast]
     );
 
     // Derived: plain array of product IDs (backward compat for fetching)

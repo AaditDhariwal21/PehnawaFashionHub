@@ -3,6 +3,7 @@ import { Tag, Check, X, Loader2 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import formatPrice from '../utils/formatPrice';
 import { promoErrorMessage } from '../utils/promoErrors';
+import { useSiteConfig } from '../utils/siteConfig';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -19,6 +20,7 @@ const API = import.meta.env.VITE_API_URL;
  */
 const PromoCodeInput = ({ checkoutItems, disabled = false }) => {
     const { appliedPromo, applyPromo, clearPromo } = useCart();
+    const guestCheckoutEnabled = useSiteConfig()?.guestCheckoutEnabled ?? null;
     const [code, setCode] = useState('');
     const [error, setError] = useState('');
     const [applying, setApplying] = useState(false);
@@ -37,17 +39,20 @@ const PromoCodeInput = ({ checkoutItems, disabled = false }) => {
         setError('');
 
         try {
+            /* Guests use the guest endpoint, which checks everything except
+               the per-customer limits — those are enforced at Pay, against
+               the checkout email. */
             const token = localStorage.getItem('token');
-            if (!token) {
+            if (!token && guestCheckoutEnabled === false) {
                 setError('Please sign in to use a promo code.');
                 return;
             }
 
-            const res = await fetch(`${API}/promo/validate`, {
+            const res = await fetch(`${API}/promo/${token ? 'validate' : 'guest/validate'}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
                 body: JSON.stringify({
                     code: trimmed,
@@ -177,6 +182,9 @@ const PromoCodeInput = ({ checkoutItems, disabled = false }) => {
                         disabled={applying || disabled}
                         placeholder="Promo code"
                         aria-label="Promo code"
+                        className="promo-code-input"
+                        enterKeyHint="done"
+                        autoCapitalize="characters"
                         autoComplete="off"
                         spellCheck="false"
                         style={{
@@ -198,6 +206,7 @@ const PromoCodeInput = ({ checkoutItems, disabled = false }) => {
                 <button
                     type="button"
                     onClick={handleApply}
+                    className="promo-apply-btn"
                     disabled={applying || disabled || !code.trim()}
                     style={{
                         padding: '0.65rem 1.1rem',

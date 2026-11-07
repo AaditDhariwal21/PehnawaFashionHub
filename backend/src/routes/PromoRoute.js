@@ -1,6 +1,7 @@
 import express from "express";
-import { validatePromoCode } from "../controllers/PromoController.js";
+import { validatePromoCode, validateGuestPromoCode } from "../controllers/PromoController.js";
 import { verifyToken } from "../middlewares/AuthMiddleware.js";
+import { promoValidateLimiter } from "../middlewares/RateLimitMiddleware.js";
 
 const router = express.Router();
 
@@ -8,6 +9,11 @@ const router = express.Router();
 //                            computed discount. Advisory: takes no usage slot.
 //                            Requires auth because per-user limits and
 //                            first-order-only eligibility are per-customer.
-router.post("/validate", verifyToken, validatePromoCode);
+router.post("/validate", promoValidateLimiter, verifyToken, validatePromoCode);
+
+// POST /api/promo/guest/validate → The same for a guest, without the
+//                                  per-customer rules (enforced at checkout,
+//                                  against the checkout email).
+router.post("/guest/validate", promoValidateLimiter, validateGuestPromoCode);
 
 export default router;
